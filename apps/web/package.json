@@ -1,0 +1,36 @@
+{
+  "name": "@teguns/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "build:cf": "opennextjs-cloudflare build",
+    "preview": "opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare deploy",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.4.0",
+    "@teguns/auth": "workspace:*",
+    "@teguns/db": "workspace:*",
+    "@teguns/seo": "workspace:*",
+    "@teguns/ui": "workspace:*",
+    "drizzle-orm": "^0.39.0",
+    "next-intl": "^4.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
+    "@tailwindcss/postcss": "^4.2.4",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "next": "16.2.4",
+    "postcss": "^8.5.10",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.8.0",
+    "wrangler": "^4.0.0"
+  }
+}

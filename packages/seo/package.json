@@ -1,0 +1,31 @@
+{
+  "name": "@teguns/seo",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./validators": "./src/validators/index.ts",
+    "./analyzers": "./src/analyzers/index.ts",
+    "./schema": "./src/schema/index.ts",
+    "./metadata": "./src/metadata/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@teguns/db": "workspace:*",
+    "schema-dts": "^1.1.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0",
+    "typescript": "^5.8.0"
+  },
+  "peerDependencies": {
+    "next": "^16.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
+  }
+}

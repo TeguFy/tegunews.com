@@ -1,0 +1,33 @@
+{
+  "name": "@teguns/api",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": "./src/app.ts",
+    "./openapi": "./src/openapi.ts",
+    "./routes/posts": "./src/routes/posts.ts",
+    "./routes/categories": "./src/routes/categories.ts",
+    "./routes/tags": "./src/routes/tags.ts",
+    "./routes/comments": "./src/routes/comments.ts",
+    "./routes/media": "./src/routes/media.ts"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@teguns/auth": "workspace:*",
+    "@teguns/db": "workspace:*",
+    "@teguns/seo": "workspace:*",
+    "@hono/zod-openapi": "^1.0.0",
+    "@hono/swagger-ui": "^0.5.0",
+    "drizzle-orm": "^0.39.0",
+    "hono": "^4.9.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
+  }
+}

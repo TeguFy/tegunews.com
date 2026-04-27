@@ -1,0 +1,25 @@
+{
+  "name": "@teguns/db",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate:local": "wrangler d1 migrations apply tegunews --local",
+    "migrate:prod": "wrangler d1 migrations apply tegunews",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.39.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.0.0",
+    "better-sqlite3": "^11.0.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "drizzle-kit": "^0.30.0",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "site": {
+    "name": "TeguNews",
+    "tagline": "News, fast — and worth reading"
+  },
+  "nav": {
+    "home": "Home",
+    "latest": "Latest",
+    "world": "World",
+    "tech": "Tech",
+    "business": "Business",
+    "opinion": "Opinion",
+    "search": "Search"
+  },
+  "home": {
+    "breaking": "Breaking",
+    "featured": "Top Story",
+    "latest": "Latest News",
+    "trending": "Trending"
+  },
+  "article": {
+    "publishedOn": "Published",
+    "updatedOn": "Updated",
+    "readingTime": "{minutes} min read",
+    "byAuthor": "By {name}",
+    "in": "in",
+    "share": "Share",
+    "comments": "Comments"
+  },
+  "comments": {
+    "title": "Comments",
+    "count": "{count, plural, =0 {No comments yet} =1 {1 comment} other {# comments}}",
+    "writePlaceholder": "Add to the conversation…",
+    "submit": "Post comment",
+    "reply": "Reply",
+    "cancel": "Cancel",
+    "name": "Name",
+    "email": "Email (not published)",
+    "website": "Website (optional)",
+    "rules": "Be civil. No hate speech, no spam. Comments are moderated.",
+    "pendingNotice": "Your comment is awaiting moderation.",
+    "approvedNotice": "Comment posted.",
+    "loginToPost": "Sign in to comment, or post as a guest.",
+    "guestMode": "Posting as guest",
+    "closed": "Comments are closed for this article."
+  },
+  "footer": {
+    "browse": "Browse",
+    "company": "Company",
+    "legal": "Legal",
+    "about": "About",
+    "contact": "Contact",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "corrections": "Corrections",
+    "ethics": "Ethics policy",
+    "rss": "RSS feed",
+    "rights": "All rights reserved.",
+    "tagline": "Independent news. Sourced, dated, and corrected when wrong."
+  }
+}

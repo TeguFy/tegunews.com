@@ -1,0 +1,61 @@
+{
+  "site": {
+    "name": "TeguNews",
+    "tagline": "Tin tức nhanh — và đáng đọc"
+  },
+  "nav": {
+    "home": "Trang chủ",
+    "latest": "Mới nhất",
+    "world": "Thế giới",
+    "tech": "Công nghệ",
+    "business": "Kinh doanh",
+    "opinion": "Bình luận",
+    "search": "Tìm kiếm"
+  },
+  "home": {
+    "breaking": "Nóng",
+    "featured": "Bài hàng đầu",
+    "latest": "Tin mới",
+    "trending": "Xu hướng"
+  },
+  "article": {
+    "publishedOn": "Đăng ngày",
+    "updatedOn": "Cập nhật",
+    "readingTime": "{minutes} phút đọc",
+    "byAuthor": "Bởi {name}",
+    "in": "trong",
+    "share": "Chia sẻ",
+    "comments": "Bình luận"
+  },
+  "comments": {
+    "title": "Bình luận",
+    "count": "{count, plural, =0 {Chưa có bình luận} =1 {1 bình luận} other {# bình luận}}",
+    "writePlaceholder": "Tham gia thảo luận…",
+    "submit": "Gửi bình luận",
+    "reply": "Trả lời",
+    "cancel": "Huỷ",
+    "name": "Tên",
+    "email": "Email (không đăng công khai)",
+    "website": "Trang web (tuỳ chọn)",
+    "rules": "Lịch sự. Không thù ghét, không spam. Bình luận được kiểm duyệt.",
+    "pendingNotice": "Bình luận của bạn đang chờ kiểm duyệt.",
+    "approvedNotice": "Đã đăng bình luận.",
+    "loginToPost": "Đăng nhập để bình luận, hoặc đăng dưới dạng khách.",
+    "guestMode": "Đăng với tư cách khách",
+    "closed": "Đã đóng bình luận cho bài này."
+  },
+  "footer": {
+    "browse": "Khám phá",
+    "company": "Công ty",
+    "legal": "Pháp lý",
+    "about": "Giới thiệu",
+    "contact": "Liên hệ",
+    "privacy": "Bảo mật",
+    "terms": "Điều khoản",
+    "corrections": "Đính chính",
+    "ethics": "Quy tắc đạo đức",
+    "rss": "RSS feed",
+    "rights": "Đã đăng ký bản quyền.",
+    "tagline": "Tin tức độc lập. Có nguồn, có ngày, sửa khi sai."
+  }
+}

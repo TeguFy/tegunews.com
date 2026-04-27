@@ -1,0 +1,102 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
+import { CommentForm } from './comment-form'
+import type { CommentNode } from './comments'
+
+interface TreeNode {
+  comment: CommentNode
+  children: TreeNode[]
+}
+
+interface Props {
+  node: TreeNode
+  depth: number
+  postId: string
+  locale: string
+  replyingTo: string | null
+  onReply: (id: string | null) => void
+  onSubmitted: (c: CommentNode, status: string) => void
+}
+
+const MAX_VISIBLE_DEPTH = 5
+
+export function CommentItem({ node, depth, postId, locale, replyingTo, onReply, onSubmitted }: Props) {
+  const t = useTranslations('comments')
+  const c = node.comment
+  const indent = Math.min(depth, MAX_VISIBLE_DEPTH)
+  const isReplying = replyingTo === c.id
+  const date = new Date(c.createdAt)
+
+  const avatar = c.authorEmailHash
+    ? `https://www.gravatar.com/avatar/${c.authorEmailHash}?d=mp&s=64`
+    : null
+
+  return (
+    <article
+      id={`comment-${c.id}`}
+      className="rounded-lg border border-border bg-background p-4"
+      style={{ marginLeft: `${indent * 1.25}rem` }}
+    >
+      <header className="flex items-center gap-3">
+        {avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatar} alt="" width={32} height={32} className="h-8 w-8 rounded-full bg-muted" />
+        ) : (
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-muted text-xs font-semibold uppercase">
+            {c.authorName.slice(0, 1)}
+          </span>
+        )}
+        <div className="leading-tight">
+          <p className="text-sm font-semibold">
+            {c.authorWebsite
+              ? <a href={c.authorWebsite} rel="ugc nofollow noopener" target="_blank">{c.authorName}</a>
+              : c.authorName}
+          </p>
+          <time dateTime={date.toISOString()} className="text-xs text-muted-foreground">
+            {date.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })}
+          </time>
+        </div>
+      </header>
+
+      <div
+        className="prose-news mt-3 text-sm"
+        // The body is sanitised server-side in `renderCommentBody`.
+        dangerouslySetInnerHTML={{ __html: c.bodyHtml }}
+      />
+
+      <div className="mt-3 flex gap-3 text-xs">
+        <button
+          type="button"
+          onClick={() => onReply(isReplying ? null : c.id)}
+          className="font-medium text-primary hover:underline"
+        >
+          {isReplying ? t('cancel') : t('reply')}
+        </button>
+      </div>
+
+      {isReplying && (
+        <div className="mt-4">
+          <CommentForm postId={postId} parentId={c.id} locale={locale} onSubmitted={onSubmitted} />
+        </div>
+      )}
+
+      {node.children.length > 0 && (
+        <div className="mt-4 space-y-4">
+          {node.children.map((child) => (
+            <CommentItem
+              key={child.comment.id}
+              node={child}
+              depth={depth + 1}
+              postId={postId}
+              locale={locale}
+              replyingTo={replyingTo}
+              onReply={onReply}
+              onSubmitted={onSubmitted}
+            />
+          ))}
+        </div>
+      )}
+    </article>
+  )
+}

@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.open-next/
+.turbo/
+dist/
+*.local
+.env
+.env.local
+.wrangler/
+.dev.vars
+.cache/
+*.tsbuildinfo
+
+# Claude Code session artefacts (keep settings.json + skills, ignore the rest)
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
+.claude/*.local.md

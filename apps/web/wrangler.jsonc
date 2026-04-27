@@ -1,0 +1,60 @@
+{
+  "name": "tegunews-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-04-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tegunews",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "REPLACE_WITH_KV_NAMESPACE_ID",
+      "preview_id": "REPLACE_WITH_KV_PREVIEW_ID"
+    },
+    {
+      "binding": "NEXT_INC_CACHE_KV",
+      "id": "REPLACE_WITH_KV_NAMESPACE_ID",
+      "preview_id": "REPLACE_WITH_KV_PREVIEW_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "tegunews-media",
+      "preview_bucket_name": "tegunews-media-dev"
+    }
+  ],
+  "vars": {
+    "NEXT_PUBLIC_APP_URL": "https://tegunews.com"
+  },
+  "routes": [
+    { "pattern": "tegunews.com", "custom_domain": true },
+    { "pattern": "www.tegunews.com", "custom_domain": true }
+  ],
+  "analytics_engine_datasets": [
+    { "binding": "ANALYTICS_ENGINE", "dataset": "tegunews_events" }
+  ],
+  // Rate limit — single per-IP bucket, applied in middleware.ts. AI/search
+  // bots bypass it. 120/min is generous: real readers never hit it, but
+  // scrape scripts slow down. Tighten to 60/min if abuse picks up.
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 120, "period": 60 }
+    }
+  ]
+}
