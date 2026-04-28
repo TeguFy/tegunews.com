@@ -15,19 +15,19 @@
     {
       "binding": "DB",
       "database_name": "tegunews",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+      "database_id": "ba8b76be-8fbf-4716-a6b4-2e22f34f1d90"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "CACHE",
-      "id": "REPLACE_WITH_KV_NAMESPACE_ID",
-      "preview_id": "REPLACE_WITH_KV_PREVIEW_ID"
+      "id": "f9c80ec602864f07bc43a2fb463f6719",
+      "preview_id": "23693b67b9e84c6ebb53f567a078f352"
     },
     {
       "binding": "NEXT_INC_CACHE_KV",
-      "id": "REPLACE_WITH_KV_NAMESPACE_ID",
-      "preview_id": "REPLACE_WITH_KV_PREVIEW_ID"
+      "id": "f9c80ec602864f07bc43a2fb463f6719",
+      "preview_id": "23693b67b9e84c6ebb53f567a078f352"
     }
   ],
   "r2_buckets": [

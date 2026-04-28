@@ -22,7 +22,35 @@ interface ExtendedEnv {
   RATE_LIMITER?: RateLimiter
 }
 
+// Locale routing — next-intl's own middleware doesn't compose with Workers
+// runtime, so we hand-roll a simple Accept-Language sniff + redirect.
+const SUPPORTED_LOCALES = ['en', 'vi'] as const
+const DEFAULT_LOCALE = 'en'
+
+function pickLocale(acceptLanguage: string | null): string {
+  if (!acceptLanguage) return DEFAULT_LOCALE
+  // Cheap parse: take the highest-quality tag whose primary subtag we support.
+  const tags = acceptLanguage.split(',').map((t) => t.split(';')[0].trim().toLowerCase())
+  for (const tag of tags) {
+    const primary = tag.split('-')[0]
+    if (SUPPORTED_LOCALES.includes(primary as never)) return primary
+  }
+  return DEFAULT_LOCALE
+}
+
 export async function middleware(req: NextRequest) {
+  const path = req.nextUrl.pathname
+
+  // Root + bare path → redirect to locale-prefixed URL. 308 so the redirect
+  // is cacheable + preserves method (POST to /something/api still goes to
+  // /something/api on the locale segment, not here).
+  if (path === '/' || path === '') {
+    const locale = pickLocale(req.headers.get('accept-language'))
+    const url = req.nextUrl.clone()
+    url.pathname = `/${locale}`
+    return NextResponse.redirect(url, 308)
+  }
+
   // AI + search bots bypass rate limit. Verified Bots in the CF dashboard
   // is what actually keeps UA-spoofers honest.
   if (classifyUa(req.headers.get('user-agent') ?? '') === 'bot') {
