@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { CommentForm } from './comment-form'
 import type { CommentNode } from './comments'
@@ -20,6 +21,8 @@ interface Props {
 }
 
 const MAX_VISIBLE_DEPTH = 5
+/** Per-browser dedupe — prevents the same user double-tapping. Not security. */
+const UPVOTE_KEY_PREFIX = 'tegunews:upvoted:'
 
 export function CommentItem({ node, depth, postId, locale, replyingTo, onReply, onSubmitted }: Props) {
   const t = useTranslations('comments')
@@ -28,9 +31,40 @@ export function CommentItem({ node, depth, postId, locale, replyingTo, onReply, 
   const isReplying = replyingTo === c.id
   const date = new Date(c.createdAt)
 
+  const [upvotes, setUpvotes] = useState(c.upvotes)
+  const [hasUpvoted, setHasUpvoted] = useState(false)
+  const [upvoting, setUpvoting] = useState(false)
+
+  useEffect(() => {
+    setHasUpvoted(typeof window !== 'undefined' && localStorage.getItem(UPVOTE_KEY_PREFIX + c.id) === '1')
+  }, [c.id])
+
+  async function handleUpvote() {
+    if (hasUpvoted || upvoting) return
+    setUpvoting(true)
+    setUpvotes((n) => n + 1)
+    setHasUpvoted(true)
+    try {
+      localStorage.setItem(UPVOTE_KEY_PREFIX + c.id, '1')
+      const res = await fetch(`/api/comments/${c.id}/upvote`, { method: 'POST' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = (await res.json()) as { upvotes: number }
+      setUpvotes(data.upvotes)
+    } catch {
+      // Roll back optimistic update on failure.
+      setUpvotes((n) => n - 1)
+      setHasUpvoted(false)
+      localStorage.removeItem(UPVOTE_KEY_PREFIX + c.id)
+    } finally {
+      setUpvoting(false)
+    }
+  }
+
   const avatar = c.authorEmailHash
     ? `https://www.gravatar.com/avatar/${c.authorEmailHash}?d=mp&s=64`
     : null
+
+  const replyCount = countDescendants(node)
 
   return (
     <article
@@ -61,11 +95,22 @@ export function CommentItem({ node, depth, postId, locale, replyingTo, onReply, 
 
       <div
         className="prose-news mt-3 text-sm"
-        // The body is sanitised server-side in `renderCommentBody`.
         dangerouslySetInnerHTML={{ __html: c.bodyHtml }}
       />
 
-      <div className="mt-3 flex gap-3 text-xs">
+      <div className="mt-3 flex items-center gap-4 text-xs">
+        <button
+          type="button"
+          onClick={handleUpvote}
+          disabled={hasUpvoted || upvoting}
+          aria-pressed={hasUpvoted}
+          className={`inline-flex items-center gap-1 transition-colors ${hasUpvoted ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+          title={t('upvote')}
+        >
+          <ChevronUp filled={hasUpvoted} />
+          <span className="font-medium">{upvotes}</span>
+        </button>
+
         <button
           type="button"
           onClick={() => onReply(isReplying ? null : c.id)}
@@ -73,6 +118,10 @@ export function CommentItem({ node, depth, postId, locale, replyingTo, onReply, 
         >
           {isReplying ? t('cancel') : t('reply')}
         </button>
+
+        {replyCount > 0 && !isReplying && (
+          <span className="text-muted-foreground">{t('replyCount', { count: replyCount })}</span>
+        )}
       </div>
 
       {isReplying && (
@@ -98,5 +147,24 @@ export function CommentItem({ node, depth, postId, locale, replyingTo, onReply, 
         </div>
       )}
     </article>
+  )
+}
+
+function countDescendants(node: TreeNode): number {
+  let n = 0
+  for (const child of node.children) n += 1 + countDescendants(child)
+  return n
+}
+
+function ChevronUp({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      width="14" height="14" viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden
+    >
+      <polyline points="18 15 12 9 6 15" />
+    </svg>
   )
 }

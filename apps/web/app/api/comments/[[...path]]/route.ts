@@ -1,10 +1,10 @@
 /**
  * Public comments endpoint — proxies through the @teguns/api `commentsRouter`.
  *
- * Mounted on the public site so the article-page island can fetch + submit
- * comments without going through the admin domain. Only the public methods
- * (`GET` list and `POST` submit) are exposed here. Moderation routes stay on
- * the admin worker behind the editor RBAC gate.
+ * Catch-all so subpaths (`/api/comments/:id/upvote`) reach the Hono router.
+ * The router itself is permissive on its public methods (list, submit,
+ * upvote); moderation routes inside the same router require auth and stay
+ * effectively unreachable from the public site.
  */
 import { createApi } from '@teguns/api'
 import { commentsRouter } from '@teguns/api/routes/comments'

@@ -254,6 +254,188 @@ postsRouter.openapi(
   },
 )
 
+// ─── Idempotent upsert by slug ──────────────────────────────────────────────
+//
+// Agent-friendly path. Slug is the natural key agents already know (URLs,
+// CSV imports, RSS guids). Calling PUT twice with the same slug is a no-op —
+// safe to retry without bookkeeping.
+//
+// Returns 200 if the post existed (updated), 201 if newly created. Body is
+// the full Post + the upserted translation, so the caller can chain to
+// /publish without a second GET.
+
+const SlugUpsertParams = z.object({
+  locale: z.string().min(2).max(10).openapi({ param: { name: 'locale', in: 'path' } }),
+  slug: z.string().min(1).max(80).openapi({ param: { name: 'slug', in: 'path' } }),
+})
+
+const SlugUpsertInput = z.object({
+  // Post-level fields. Identical to UpdatePostInput.
+  featuredImage: z.url().nullable().optional(),
+  featuredImageAlt: z.string().max(125).nullable().optional(),
+  featuredImageCredit: z.string().max(200).nullable().optional(),
+  categoryId: z.string().nullable().optional(),
+  featured: z.boolean().optional(),
+  breakingUntil: z.string().datetime().nullable().optional(),
+  commentsEnabled: z.boolean().optional(),
+  // Translation-level fields. Title + content required for upsert; the rest
+  // are optional and only updated when present (PATCH-like merge semantics).
+  title: z.string().min(1),
+  content: z.string().default(''),
+  excerpt: z.string().nullable().optional(),
+  seoTitle: z.string().nullable().optional(),
+  seoDesc: z.string().nullable().optional(),
+  ogImage: z.string().nullable().optional(),
+  focusKeyword: z.string().nullable().optional(),
+  relatedKeywords: z.array(z.string()).nullable().optional(),
+}).openapi('SlugUpsertInput')
+
+postsRouter.openapi(
+  createRoute({
+    method: 'get',
+    path: '/by-slug/{locale}/{slug}',
+    tags: ['Posts'],
+    summary: 'Get post by (locale, slug)',
+    security,
+    request: { params: SlugUpsertParams },
+    responses: {
+      200: { description: 'OK', content: { 'application/json': { schema: PostSchema } } },
+      404: { description: 'Not found', content: { 'application/json': { schema: ErrorSchema } } },
+    },
+  }),
+  async (c) => {
+    const { locale, slug } = c.req.valid('param')
+    const [tr] = await c.var.db
+      .select({ postId: postTranslations.postId })
+      .from(postTranslations)
+      .where(and(eq(postTranslations.locale, locale), eq(postTranslations.slug, slug)))
+    if (!tr) return c.json({ error: 'not_found' }, 404)
+    const [post] = await c.var.db.select().from(posts).where(eq(posts.id, tr.postId))
+    if (!post) return c.json({ error: 'not_found' }, 404)
+    return c.json(serialise(post), 200)
+  },
+)
+
+postsRouter.openapi(
+  createRoute({
+    method: 'put',
+    path: '/by-slug/{locale}/{slug}',
+    tags: ['Posts'],
+    summary: 'Idempotent upsert by (locale, slug)',
+    description:
+      'Creates or updates a post + its translation in one call. Slug is the natural key. Safe to retry — second call with same body is a no-op.',
+    security,
+    middleware: [requireRole(ROLES.AUTHOR)] as const,
+    request: {
+      params: SlugUpsertParams,
+      body: { content: { 'application/json': { schema: SlugUpsertInput } } },
+    },
+    responses: {
+      200: { description: 'Existed; updated', content: { 'application/json': { schema: PostSchema } } },
+      201: { description: 'Created', content: { 'application/json': { schema: PostSchema } } },
+    },
+  }),
+  async (c) => {
+    const { locale, slug } = c.req.valid('param')
+    const input = c.req.valid('json')
+    const userId = c.var.userId ?? 'system'
+    const now = new Date()
+
+    // Try to locate an existing translation (slug+locale is unique).
+    const [existingTr] = await c.var.db
+      .select({ postId: postTranslations.postId })
+      .from(postTranslations)
+      .where(and(eq(postTranslations.locale, locale), eq(postTranslations.slug, slug)))
+
+    let postId = existingTr?.postId
+    let created = false
+
+    if (!postId) {
+      // Create the post first; translation upsert below attaches to it.
+      postId = crypto.randomUUID()
+      created = true
+      await c.var.db.insert(posts).values({
+        id: postId,
+        status: 'draft',
+        featuredImage: input.featuredImage ?? null,
+        featuredImageAlt: input.featuredImageAlt ?? null,
+        featuredImageCredit: input.featuredImageCredit ?? null,
+        categoryId: input.categoryId ?? null,
+        authorId: userId,
+        featured: input.featured ?? false,
+        breakingUntil: input.breakingUntil ? new Date(input.breakingUntil) : null,
+        commentsEnabled: input.commentsEnabled ?? true,
+        createdAt: now,
+        updatedAt: now,
+      })
+    } else {
+      // Patch post-level fields if any were supplied.
+      const patch: Record<string, unknown> = { updatedAt: now }
+      if (input.featuredImage !== undefined) patch.featuredImage = input.featuredImage
+      if (input.featuredImageAlt !== undefined) patch.featuredImageAlt = input.featuredImageAlt
+      if (input.featuredImageCredit !== undefined) patch.featuredImageCredit = input.featuredImageCredit
+      if (input.categoryId !== undefined) patch.categoryId = input.categoryId
+      if (input.featured !== undefined) patch.featured = input.featured
+      if (input.breakingUntil !== undefined) {
+        patch.breakingUntil = input.breakingUntil ? new Date(input.breakingUntil) : null
+      }
+      if (input.commentsEnabled !== undefined) patch.commentsEnabled = input.commentsEnabled
+      await c.var.db.update(posts).set(patch).where(eq(posts.id, postId))
+    }
+
+    // Upsert the translation (recompute derived fields).
+    const baseUrl =
+      (globalThis as { process?: { env?: Record<string, string | undefined> } })
+        .process?.env?.NEXT_PUBLIC_APP_URL ?? 'https://tegunews.com'
+    const wordCount = countWords(input.content)
+    const links = extractLinks(input.content, baseUrl)
+    const headings = extractHeadings(input.content)
+    const keywordDensity = input.focusKeyword
+      ? calculateKeywordDensity(input.content, input.focusKeyword)
+      : null
+    const readingTime = calculateReadingTime(input.content)
+
+    const trValues = {
+      postId,
+      locale,
+      title: input.title,
+      slug,
+      content: input.content,
+      excerpt: input.excerpt ?? null,
+      seoTitle: input.seoTitle ?? null,
+      seoDesc: input.seoDesc ?? null,
+      ogImage: input.ogImage ?? null,
+      focusKeyword: input.focusKeyword ?? null,
+      relatedKeywords: input.relatedKeywords ?? null,
+      headingsOutline: headings,
+      keywordDensity,
+      wordCount,
+      noIndex: false,
+    }
+
+    await c.var.db
+      .insert(postTranslations)
+      .values(trValues)
+      .onConflictDoUpdate({
+        target: [postTranslations.postId, postTranslations.locale],
+        set: trValues,
+      })
+
+    await c.var.db
+      .update(posts)
+      .set({
+        internalLinksCount: links.internal,
+        externalLinksCount: links.external,
+        readingTime,
+        updatedAt: new Date(),
+      })
+      .where(eq(posts.id, postId))
+
+    const [post] = await c.var.db.select().from(posts).where(eq(posts.id, postId))
+    return c.json(serialise(post!), created ? 201 : 200)
+  },
+)
+
 // ─── Delete ─────────────────────────────────────────────────────────────────
 
 postsRouter.openapi(

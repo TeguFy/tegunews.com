@@ -3,8 +3,11 @@ import { ROLES } from '@teguns/auth'
 import type { Role } from '@teguns/auth'
 import type { ApiEnv } from '../app'
 
+// Agents rank with authors — same content-write capability, not editorial.
+// Editors/admins outrank agents so a runaway agent can't elevate itself.
 const RANK: Record<Role, number> = {
   [ROLES.COMMENTER]: 1,
+  [ROLES.AGENT]: 2,
   [ROLES.AUTHOR]: 2,
   [ROLES.EDITOR]: 3,
   [ROLES.ADMIN]: 4,

@@ -8,6 +8,7 @@ import {
 } from '@teguns/seo'
 import { JsonLd } from '@/components/json-ld'
 import { Comments } from '@/components/comments/comments'
+import { ShareButtons } from '@/components/share-buttons'
 import { fetchArticleBySlug, fetchRelatedArticles } from '@/lib/posts'
 import { ArticleCard } from '@/components/article-card'
 
@@ -110,6 +111,15 @@ export default async function ArticlePage({ params }: Props) {
         )}
       </div>
 
+      <ShareButtons
+        url={url}
+        title={translation.title}
+        summary={translation.excerpt ?? translation.seoDesc ?? undefined}
+        className="mt-6"
+      />
+
+      <hr className="mt-6 border-border" />
+
       {post.featuredImage && (
         <figure className="mt-8 overflow-hidden rounded-lg">
           <div className="relative aspect-video">
@@ -134,6 +144,14 @@ export default async function ArticlePage({ params }: Props) {
         className="prose-news mt-8 max-w-none"
         dangerouslySetInnerHTML={{ __html: translation.content }}
       />
+
+      <div className="mt-10 flex items-center justify-between border-t border-border pt-6">
+        <ShareButtons
+          url={url}
+          title={translation.title}
+          summary={translation.excerpt ?? translation.seoDesc ?? undefined}
+        />
+      </div>
 
       {related.length > 0 && (
         <section className="mt-16 border-t pt-8">

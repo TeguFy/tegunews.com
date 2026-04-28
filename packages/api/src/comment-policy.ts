@@ -2,19 +2,8 @@
  * Comment moderation policy.
  *
  * Decides the initial moderation `status` for a freshly-submitted comment.
- * Returning `'approved'` makes the comment immediately visible. Returning
- * `'pending'` puts it in the editor queue.
- *
- * The signal set you have to work with:
- *   - role         — null for guests, otherwise 'commenter' | 'author' | 'editor' | 'admin'
- *   - approvedHistoryCount — # of previously-approved comments by this user
- *   - bodyLength   — pre-render character count
- *   - linkCount    — number of <a href> tags in the rendered HTML
- *   - spamScore    — 0..100 from your spam check (Akismet-like), or null if unchecked
- *   - hasCaptcha   — whether the request carried a verified hCaptcha/Turnstile token
- *
- * The default policy below errs on the side of caution (queue everything from
- * guests). Tune this to match your audience and editorial bandwidth.
+ * Hybrid policy: editors auto-approve, trust-on-first-use for established
+ * commenters, hard `spam` flag for obvious abuse, otherwise `pending`.
  */
 
 export type ModerationStatus = 'pending' | 'approved' | 'spam' | 'rejected'
@@ -24,36 +13,40 @@ export interface CommentSignals {
   approvedHistoryCount: number
   bodyLength: number
   linkCount: number
-  spamScore: number | null
+  spamScore: number | null   // 0..100 from external spam check, null if unchecked
   hasCaptcha: boolean
+  /** Hidden-field bot trap. If a client filled it, it's a bot. */
+  honeypotFilled: boolean
 }
 
 export const MAX_COMMENT_DEPTH = 5
 export const MAX_COMMENT_LENGTH = 4000
 
-/**
- * TODO(human): implement the initial-status policy.
- *
- * Tradeoffs to consider:
- *   1. Strict (queue everything) — safest; community must wait, editors do all the work.
- *   2. Trust-on-first-use      — auto-approve once a user has N approved comments.
- *      Cheap, intuitive, but a single approved spammer becomes harder to detect.
- *   3. Spam-score-gated         — auto-approve when score < threshold AND no links.
- *      Only works if you have COMMENT_SPAM_API_KEY wired up.
- *   4. Privileged-only auto    — only editors/admins skip moderation. Cleanest
- *      for small sites; queue is the unit of editorial control.
- *
- * Whatever you pick, return one of: 'pending' | 'approved' | 'spam'.
- * (Don't return 'rejected' here — that is an editorial action, not an
- * automatic state.) Mark obviously-bad submissions ('spam') so they don't
- * pollute the moderation queue.
- *
- * Suggested default if you want to ship now: 'pending' for everything except
- * editors/admins. Replace this stub before opening comments to readers.
- */
+/** Min approved-history count for trust-on-first-use auto-approval. */
+const TRUST_THRESHOLD = 3
+/** Spam if more than this many links — pure URL spam. */
+const MAX_LINKS_BEFORE_SPAM = 2
+/** Drop to spam at this external spam-score threshold. */
+const SPAM_SCORE_CUTOFF = 80
+
 export function classifyComment(signals: CommentSignals): ModerationStatus {
+  // 1. Bot trap first — silent spam, never reach the queue.
+  if (signals.honeypotFilled) return 'spam'
+
+  // 2. Editors and admins are trusted authors.
   if (signals.role === 'admin' || signals.role === 'editor') return 'approved'
-  // Stub: hold for review. See TODO(human) above for the policy decision.
+
+  // 3. Cheap structural spam heuristics.
+  if (signals.linkCount > MAX_LINKS_BEFORE_SPAM) return 'spam'
+  if (signals.spamScore !== null && signals.spamScore >= SPAM_SCORE_CUTOFF) return 'spam'
+
+  // 4. Trust-on-first-use: established commenters skip the queue. Only
+  //    counts authenticated users — guests can't accumulate history.
+  if (signals.role && signals.approvedHistoryCount >= TRUST_THRESHOLD) {
+    return 'approved'
+  }
+
+  // 5. Default: hold for editor review.
   return 'pending'
 }
 

@@ -112,13 +112,14 @@ const SubmitInput = z.object({
   parentId: z.uuid().nullable().optional(),
   body: z.string().min(1).max(MAX_COMMENT_LENGTH),
   locale: z.string().min(2).max(10).optional(),
-  // Required for guests; ignored when a session is attached (we use the
-  // session user's name/email instead).
+  // Required for guests; ignored when a session is attached.
   authorName: z.string().min(1).max(80).optional(),
   authorEmail: z.email().optional(),
   authorWebsite: z.url().optional(),
-  // Optional CAPTCHA token — verified out-of-band by the host before this
-  // route runs (the host may attach `c.set('hasCaptcha', true)`).
+  // Honeypot — a CSS-hidden field. Real users don't see it; bots fill it in.
+  // Form field name is intentionally generic to lure bots.
+  honeypot: z.string().optional(),
+  // Optional CAPTCHA token — verified out-of-band by the host.
   captchaToken: z.string().optional(),
 }).openapi('SubmitCommentInput')
 
@@ -185,6 +186,7 @@ commentsRouter.openapi(submitRoute, async (c) => {
     linkCount,
     spamScore: null,
     hasCaptcha: Boolean(input.captchaToken),
+    honeypotFilled: Boolean(input.honeypot && input.honeypot.length > 0),
   })
 
   const ipHeader =
@@ -319,5 +321,40 @@ commentsRouter.openapi(
     }
 
     return c.json(serialiseForPublic(updated!), 200)
+  },
+)
+
+// ─── PUBLIC: Upvote a comment ──────────────────────────────────────────────
+//
+// No auth required. Edge rate-limit (in apps/web/middleware.ts) caps abuse;
+// client-side localStorage stops accidental double-taps. Anyone determined
+// can still spam upvotes — not security-critical, just social signal.
+
+commentsRouter.openapi(
+  createRoute({
+    method: 'post',
+    path: '/{id}/upvote',
+    tags: ['Comments'],
+    summary: 'Upvote a comment',
+    request: {
+      params: z.object({ id: z.uuid().openapi({ param: { name: 'id', in: 'path' } }) }),
+    },
+    responses: {
+      200: {
+        description: 'OK',
+        content: { 'application/json': { schema: z.object({ id: z.string(), upvotes: z.number() }) } },
+      },
+      404: { description: 'Not found', content: { 'application/json': { schema: ErrorSchema } } },
+    },
+  }),
+  async (c) => {
+    const { id } = c.req.valid('param')
+    const [updated] = await c.var.db
+      .update(comments)
+      .set({ upvotes: sql`${comments.upvotes} + 1` })
+      .where(and(eq(comments.id, id), eq(comments.status, 'approved')))
+      .returning({ id: comments.id, upvotes: comments.upvotes })
+    if (!updated) return c.json({ error: 'not_found' }, 404)
+    return c.json(updated, 200)
   },
 )

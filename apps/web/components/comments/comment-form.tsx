@@ -17,6 +17,9 @@ export function CommentForm({ postId, parentId, locale, onSubmitted }: Props) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [website, setWebsite] = useState('')
+  // Honeypot — CSS-hidden field. Real users never see it; bots fill every
+  // visible field. The route flags this and silently routes to spam.
+  const [trap, setTrap] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,6 +39,7 @@ export function CommentForm({ postId, parentId, locale, onSubmitted }: Props) {
           authorName: name,
           authorEmail: email,
           authorWebsite: website || undefined,
+          honeypot: trap || undefined,
           locale,
         }),
       })
@@ -73,6 +77,7 @@ export function CommentForm({ postId, parentId, locale, onSubmitted }: Props) {
           onChange={(e) => setName(e.target.value)}
           placeholder={t('name')}
           className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+          autoComplete="name"
         />
         <input
           type="email"
@@ -81,6 +86,7 @@ export function CommentForm({ postId, parentId, locale, onSubmitted }: Props) {
           onChange={(e) => setEmail(e.target.value)}
           placeholder={t('email')}
           className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+          autoComplete="email"
         />
         <input
           type="url"
@@ -88,8 +94,25 @@ export function CommentForm({ postId, parentId, locale, onSubmitted }: Props) {
           onChange={(e) => setWebsite(e.target.value)}
           placeholder={t('website')}
           className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+          autoComplete="url"
         />
       </div>
+
+      {/* Honeypot — visually hidden + autocomplete-off + tabindex out of order.
+          Bots filling every visible input also fill this; humans never see it. */}
+      <div aria-hidden="true" className="absolute left-[-10000px] h-0 w-0 overflow-hidden">
+        <label>
+          Website URL (leave blank)
+          <input
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+            value={trap}
+            onChange={(e) => setTrap(e.target.value)}
+          />
+        </label>
+      </div>
+
       <p className="text-xs text-muted-foreground">{t('rules')}</p>
       {error && <p className="text-xs text-red-600">{error}</p>}
       <button
