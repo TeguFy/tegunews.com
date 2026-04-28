@@ -44,8 +44,8 @@ export function Comments({ postId, locale, commentsEnabled, initialCount }: Prop
   useEffect(() => {
     let cancelled = false
     fetch(`/api/comments?postId=${encodeURIComponent(postId)}`)
-      .then((r) => r.json())
-      .then((d: { items: CommentNode[]; total: number }) => {
+      .then((r) => r.json() as Promise<{ items: CommentNode[]; total: number }>)
+      .then((d) => {
         if (cancelled) return
         setItems(d.items)
         setCount(d.total)

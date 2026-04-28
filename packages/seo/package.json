@@ -10,7 +10,7 @@
     "./metadata": "./src/metadata/index.ts"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@teguns/db": "workspace:*",

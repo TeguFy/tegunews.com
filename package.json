@@ -7,9 +7,16 @@
     "dev": "turbo run dev --parallel",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "bootstrap": "bash scripts/bootstrap.sh",
+    "db:generate": "pnpm --filter @teguns/db generate && cp packages/db/migrations/*.sql apps/web/migrations/ && cp packages/db/migrations/*.sql apps/admin/migrations/",
+    "deploy:web": "pnpm --filter @teguns/web build:cf && pnpm --filter @teguns/web run deploy",
+    "deploy:admin": "pnpm --filter @teguns/admin build:cf && pnpm --filter @teguns/admin run deploy",
+    "deploy:cron": "pnpm --filter @teguns/cron run deploy",
+    "deploy:all": "pnpm deploy:web && pnpm deploy:admin && pnpm deploy:cron"
   },
   "devDependencies": {
+    "tsx": "^4.20.6",
     "turbo": "^2.5.0",
     "typescript": "^5.8.0"
   }

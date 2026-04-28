@@ -9,16 +9,16 @@
     "generate": "drizzle-kit generate",
     "migrate:local": "wrangler d1 migrations apply tegunews --local",
     "migrate:prod": "wrangler d1 migrations apply tegunews",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "drizzle-orm": "^0.39.0"
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.0.0",
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^12.4.1",
     "@types/better-sqlite3": "^7.6.0",
-    "drizzle-kit": "^0.30.0",
+    "drizzle-kit": "^0.31.5",
     "vitest": "^3.0.0",
     "wrangler": "^4.0.0"
   }

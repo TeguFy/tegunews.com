@@ -245,6 +245,7 @@ postsRouter.openapi(
     responses: {
       200: { description: 'OK', content: { 'application/json': { schema: PostSchema } } },
       404: { description: 'Not found', content: { 'application/json': { schema: ErrorSchema } } },
+      409: { description: 'Version mismatch (If-Match)', content: { 'application/json': { schema: z.object({ error: z.string(), current: z.number() }) } } },
     },
   }),
   async (c) => {
@@ -269,11 +270,19 @@ postsRouter.openapi(
       }
     }
 
+    // Convert ISO datetime strings (zod input) to Date (Drizzle column type).
+    // `null` and `undefined` pass through unchanged.
+    const { breakingUntil, ...rest } = patch
+    const breakingUntilDate =
+      breakingUntil === undefined ? undefined :
+      breakingUntil === null ? null :
+      new Date(breakingUntil)
+
     const updated = await c.var.db
       .update(posts)
       .set({
-        ...patch,
-        breakingUntil: patch.breakingUntil ? new Date(patch.breakingUntil) : patch.breakingUntil,
+        ...rest,
+        ...(breakingUntilDate !== undefined ? { breakingUntil: breakingUntilDate } : {}),
         updatedAt: new Date(),
         version: sql`${posts.version} + 1`,
       })
@@ -381,12 +390,15 @@ postsRouter.openapi(
     // WITHOUT touching the DB. Lets agents validate input shape + see the
     // derived fields (readingTime, wordCount) before committing.
     if (dry_run) {
-      const previewWordCount = countWords(input.content)
       const previewReading = calculateReadingTime(input.content)
+      // Build a Post-shaped preview that satisfies PostSchema. The wordCount
+      // and other dry-run-specific signals are derivable client-side from the
+      // input — keeping the response shape strict means the SDK doesn't
+      // need a special branch for dry-run results.
       return c.json(
         {
           id: 'dry-run',
-          status: 'draft',
+          status: 'draft' as const,
           featuredImage: input.featuredImage ?? null,
           featuredImageAlt: input.featuredImageAlt ?? null,
           featuredImageCredit: input.featuredImageCredit ?? null,
@@ -408,7 +420,6 @@ postsRouter.openapi(
           originalSourceName: input.originalSourceName ?? null,
           bylineDisclosure: input.bylineDisclosure ?? null,
           version: 0,
-          _dryRunPreview: { wordCount: previewWordCount, locale, slug },
         },
         200,
       )

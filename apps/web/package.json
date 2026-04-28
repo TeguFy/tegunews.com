@@ -12,11 +12,12 @@
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.4.0",
+    "@teguns/api": "workspace:*",
     "@teguns/auth": "workspace:*",
     "@teguns/db": "workspace:*",
     "@teguns/seo": "workspace:*",
     "@teguns/ui": "workspace:*",
-    "drizzle-orm": "^0.39.0",
+    "drizzle-orm": "^0.45.2",
     "next-intl": "^4.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
