@@ -24,6 +24,7 @@ for (const c of items) {
 ```
 
 Each call:
+
 - Updates `comments.status` + `moderated_by` + `moderated_at`
 - Bumps `posts.commentCount` if approving (decrements if un-approving)
 - Is fully idempotent (re-applying the same action is a no-op DB-wise)

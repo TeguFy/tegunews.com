@@ -8,7 +8,7 @@
  * 422 with field-level errors if the draft fails the SEO gate.
  */
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
-import { and, count, desc, eq } from 'drizzle-orm'
+import { and, count, desc, eq, sql } from 'drizzle-orm'
 import { posts, postTranslations } from '@teguns/db'
 import {
   validatePostForPublish,
@@ -21,7 +21,9 @@ import {
 } from '@teguns/seo'
 import { ROLES } from '@teguns/auth'
 import { authMiddleware } from '../middleware/auth'
-import { requireRole } from '../middleware/rbac'
+import { requireRole, requireScope } from '../middleware/rbac'
+import { audit } from '../audit'
+import { emitEvent } from '../webhook-emit'
 import type { ApiEnv } from '../app'
 
 export const postsRouter = new OpenAPIHono<ApiEnv>()
@@ -51,6 +53,10 @@ const PostSchema = z.object({
   readingTime: z.number().nullable(),
   internalLinksCount: z.number(),
   externalLinksCount: z.number(),
+  originalSourceUrl: z.string().nullable(),
+  originalSourceName: z.string().nullable(),
+  bylineDisclosure: z.string().nullable(),
+  version: z.number(),
 }).openapi('Post')
 
 const ErrorSchema = z.object({ error: z.string() }).openapi('Error')
@@ -167,7 +173,7 @@ postsRouter.openapi(
     tags: ['Posts'],
     summary: 'Create a draft article',
     security,
-    middleware: [requireRole(ROLES.AUTHOR)] as const,
+    middleware: [requireRole(ROLES.AUTHOR), requireScope("posts:write")] as const,
     request: { body: { content: { 'application/json': { schema: CreatePostInput } } } },
     responses: {
       201: { description: 'Created', content: { 'application/json': { schema: PostSchema } } },
@@ -218,6 +224,10 @@ const UpdatePostInput = z.object({
   featured: z.boolean().optional(),
   breakingUntil: z.string().datetime().nullable().optional(),
   commentsEnabled: z.boolean().optional(),
+  // Source attribution — required for wire imports.
+  originalSourceUrl: z.url().nullable().optional(),
+  originalSourceName: z.string().max(120).nullable().optional(),
+  bylineDisclosure: z.enum(['AI-assisted', 'AI-generated', 'wire', 'staff']).nullable().optional(),
 }).openapi('UpdatePostInput')
 
 postsRouter.openapi(
@@ -227,7 +237,7 @@ postsRouter.openapi(
     tags: ['Posts'],
     summary: 'Update post fields',
     security,
-    middleware: [requireRole(ROLES.AUTHOR)] as const,
+    middleware: [requireRole(ROLES.AUTHOR), requireScope("posts:write")] as const,
     request: {
       params: postIdParam,
       body: { content: { 'application/json': { schema: UpdatePostInput } } },
@@ -240,16 +250,37 @@ postsRouter.openapi(
   async (c) => {
     const { id } = c.req.valid('param')
     const patch = c.req.valid('json')
+
+    // Optimistic lock: If-Match header (when present) must equal the current
+    // row's version. Two agents racing on the same article get a 409 on the
+    // loser's call instead of silent overwrite.
+    const ifMatch = c.req.header('if-match')
+    if (ifMatch !== undefined) {
+      const [current] = await c.var.db
+        .select({ version: posts.version })
+        .from(posts)
+        .where(eq(posts.id, id))
+      if (!current) return c.json({ error: 'not_found' }, 404)
+      if (String(current.version) !== ifMatch.replace(/"/g, '')) {
+        return c.json(
+          { error: 'version_mismatch', current: current.version },
+          409,
+        )
+      }
+    }
+
     const updated = await c.var.db
       .update(posts)
       .set({
         ...patch,
         breakingUntil: patch.breakingUntil ? new Date(patch.breakingUntil) : patch.breakingUntil,
         updatedAt: new Date(),
+        version: sql`${posts.version} + 1`,
       })
       .where(eq(posts.id, id))
       .returning()
     if (!updated[0]) return c.json({ error: 'not_found' }, 404)
+    await audit(c, 'post.update', id, { fields: Object.keys(patch) })
     return c.json(serialise(updated[0]), 200)
   },
 )
@@ -278,6 +309,9 @@ const SlugUpsertInput = z.object({
   featured: z.boolean().optional(),
   breakingUntil: z.string().datetime().nullable().optional(),
   commentsEnabled: z.boolean().optional(),
+  originalSourceUrl: z.url().nullable().optional(),
+  originalSourceName: z.string().max(120).nullable().optional(),
+  bylineDisclosure: z.enum(['AI-assisted', 'AI-generated', 'wire', 'staff']).nullable().optional(),
   // Translation-level fields. Title + content required for upsert; the rest
   // are optional and only updated when present (PATCH-like merge semantics).
   title: z.string().min(1),
@@ -323,23 +357,62 @@ postsRouter.openapi(
     tags: ['Posts'],
     summary: 'Idempotent upsert by (locale, slug)',
     description:
-      'Creates or updates a post + its translation in one call. Slug is the natural key. Safe to retry — second call with same body is a no-op.',
+      'Creates or updates a post + its translation in one call. Slug is the natural key. Safe to retry — second call with same body is a no-op. Pass `?dry_run=1` to validate the input + return the would-be result without writing.',
     security,
-    middleware: [requireRole(ROLES.AUTHOR)] as const,
+    middleware: [requireRole(ROLES.AUTHOR), requireScope("posts:write")] as const,
     request: {
       params: SlugUpsertParams,
+      query: z.object({ dry_run: z.coerce.boolean().optional() }),
       body: { content: { 'application/json': { schema: SlugUpsertInput } } },
     },
     responses: {
-      200: { description: 'Existed; updated', content: { 'application/json': { schema: PostSchema } } },
+      200: { description: 'Existed; updated (or dry_run preview)', content: { 'application/json': { schema: PostSchema } } },
       201: { description: 'Created', content: { 'application/json': { schema: PostSchema } } },
     },
   }),
   async (c) => {
     const { locale, slug } = c.req.valid('param')
+    const { dry_run } = c.req.valid('query')
     const input = c.req.valid('json')
     const userId = c.var.userId ?? 'system'
     const now = new Date()
+
+    // Dry-run short-circuit: build the would-be Post object and return it
+    // WITHOUT touching the DB. Lets agents validate input shape + see the
+    // derived fields (readingTime, wordCount) before committing.
+    if (dry_run) {
+      const previewWordCount = countWords(input.content)
+      const previewReading = calculateReadingTime(input.content)
+      return c.json(
+        {
+          id: 'dry-run',
+          status: 'draft',
+          featuredImage: input.featuredImage ?? null,
+          featuredImageAlt: input.featuredImageAlt ?? null,
+          featuredImageCredit: input.featuredImageCredit ?? null,
+          authorId: userId,
+          authorName: null,
+          authorAvatar: null,
+          categoryId: input.categoryId ?? null,
+          publishedAt: null,
+          createdAt: now.toISOString(),
+          updatedAt: now.toISOString(),
+          featured: input.featured ?? false,
+          breakingUntil: input.breakingUntil ?? null,
+          commentsEnabled: input.commentsEnabled ?? true,
+          commentCount: 0,
+          readingTime: previewReading,
+          internalLinksCount: 0,
+          externalLinksCount: 0,
+          originalSourceUrl: input.originalSourceUrl ?? null,
+          originalSourceName: input.originalSourceName ?? null,
+          bylineDisclosure: input.bylineDisclosure ?? null,
+          version: 0,
+          _dryRunPreview: { wordCount: previewWordCount, locale, slug },
+        },
+        200,
+      )
+    }
 
     // Try to locate an existing translation (slug+locale is unique).
     const [existingTr] = await c.var.db
@@ -365,12 +438,15 @@ postsRouter.openapi(
         featured: input.featured ?? false,
         breakingUntil: input.breakingUntil ? new Date(input.breakingUntil) : null,
         commentsEnabled: input.commentsEnabled ?? true,
+        originalSourceUrl: input.originalSourceUrl ?? null,
+        originalSourceName: input.originalSourceName ?? null,
+        bylineDisclosure: input.bylineDisclosure ?? null,
         createdAt: now,
         updatedAt: now,
       })
     } else {
       // Patch post-level fields if any were supplied.
-      const patch: Record<string, unknown> = { updatedAt: now }
+      const patch: Record<string, unknown> = { updatedAt: now, version: sql`${posts.version} + 1` }
       if (input.featuredImage !== undefined) patch.featuredImage = input.featuredImage
       if (input.featuredImageAlt !== undefined) patch.featuredImageAlt = input.featuredImageAlt
       if (input.featuredImageCredit !== undefined) patch.featuredImageCredit = input.featuredImageCredit
@@ -380,6 +456,9 @@ postsRouter.openapi(
         patch.breakingUntil = input.breakingUntil ? new Date(input.breakingUntil) : null
       }
       if (input.commentsEnabled !== undefined) patch.commentsEnabled = input.commentsEnabled
+      if (input.originalSourceUrl !== undefined) patch.originalSourceUrl = input.originalSourceUrl
+      if (input.originalSourceName !== undefined) patch.originalSourceName = input.originalSourceName
+      if (input.bylineDisclosure !== undefined) patch.bylineDisclosure = input.bylineDisclosure
       await c.var.db.update(posts).set(patch).where(eq(posts.id, postId))
     }
 
@@ -432,6 +511,7 @@ postsRouter.openapi(
       .where(eq(posts.id, postId))
 
     const [post] = await c.var.db.select().from(posts).where(eq(posts.id, postId))
+    await audit(c, created ? 'post.create' : 'post.upsert', postId, { locale, slug })
     return c.json(serialise(post!), created ? 201 : 200)
   },
 )
@@ -445,7 +525,7 @@ postsRouter.openapi(
     tags: ['Posts'],
     summary: 'Delete a post (cascades translations + tags + comments)',
     security,
-    middleware: [requireRole(ROLES.EDITOR)] as const,
+    middleware: [requireRole(ROLES.EDITOR), requireScope("posts:write")] as const,
     request: { params: postIdParam },
     responses: {
       204: { description: 'Deleted' },
@@ -456,35 +536,53 @@ postsRouter.openapi(
     const { id } = c.req.valid('param')
     const res = await c.var.db.delete(posts).where(eq(posts.id, id)).returning({ id: posts.id })
     if (!res[0]) return c.json({ error: 'not_found' }, 404)
+    await audit(c, 'post.delete', id)
     return c.body(null, 204)
   },
 )
 
 // ─── Publish ────────────────────────────────────────────────────────────────
+//
+// Modes:
+//   default                  → publish now (status='published')
+//   ?at=<ISO future>         → schedule (status='scheduled', publishedAt=at)
+//   ?dry_run=1               → run SEO gate, return what would be saved, no write
+//
+// Idempotent:
+//   - Already-published post: returns 200 with the current row (no-op).
+//   - Re-scheduling to the same `at`: no-op. Different `at`: updates row.
 
 postsRouter.openapi(
   createRoute({
     method: 'post',
     path: '/{id}/publish',
     tags: ['Posts'],
-    summary: 'Publish a post (gated by SEO validators)',
+    summary: 'Publish or schedule a post (gated by SEO validators)',
+    description:
+      'Defaults to publishing immediately. Pass `?at=<ISO>` to schedule for a future timestamp; the cron handler in apps/admin promotes scheduled→published when the time arrives. Pass `?dry_run=1` to validate without writing — the body returned is what would have been saved.',
     security,
-    middleware: [requireRole(ROLES.EDITOR)] as const,
+    middleware: [requireRole(ROLES.EDITOR), requireScope("posts:write")] as const,
     request: {
       params: postIdParam,
-      query: z.object({ locale: z.string().min(2).max(10).default('en') }),
+      query: z.object({
+        locale: z.string().min(2).max(10).default('en'),
+        at: z.string().datetime().optional(),
+        dry_run: z.coerce.boolean().optional(),
+      }),
     },
     responses: {
-      200: { description: 'Published', content: { 'application/json': { schema: PostSchema } } },
+      200: { description: 'Published / scheduled / would-have-been (dry_run)', content: { 'application/json': { schema: PostSchema } } },
       404: { description: 'Not found', content: { 'application/json': { schema: ErrorSchema } } },
       422: { description: 'SEO gate failed', content: { 'application/json': { schema: FieldErrorSchema } } },
     },
   }),
   async (c) => {
     const { id } = c.req.valid('param')
-    const { locale } = c.req.valid('query')
+    const { locale, at, dry_run } = c.req.valid('query')
+
     const [post] = await c.var.db.select().from(posts).where(eq(posts.id, id))
     if (!post) return c.json({ error: 'not_found' }, 404)
+
     const [tr] = await c.var.db
       .select()
       .from(postTranslations)
@@ -495,14 +593,58 @@ postsRouter.openapi(
         422,
       )
     }
+
     const errors = [...validatePostForPublish(post), ...validateTranslationForPublish(tr)]
     if (errors.length) return c.json({ error: 'seo_gate_failed', fields: errors }, 422)
+
     const now = new Date()
+    const scheduledAt = at ? new Date(at) : null
+
+    // Validate scheduling: `at` must be in the future. `at` in the past = publish now.
+    const isFuture = scheduledAt && scheduledAt.getTime() > now.getTime() + 60_000  // 60s grace
+    const targetStatus: 'scheduled' | 'published' = isFuture ? 'scheduled' : 'published'
+    const targetPublishedAt = isFuture ? scheduledAt! : now
+
+    if (dry_run) {
+      // Show what would be saved without writing.
+      return c.json(
+        serialise({
+          ...post,
+          status: targetStatus,
+          publishedAt: targetPublishedAt,
+          updatedAt: now,
+        }),
+        200,
+      )
+    }
+
     const [updated] = await c.var.db
       .update(posts)
-      .set({ status: 'published', publishedAt: now, updatedAt: now })
+      .set({
+        status: targetStatus,
+        publishedAt: targetPublishedAt,
+        updatedAt: now,
+        version: sql`${posts.version} + 1`,
+      })
       .where(eq(posts.id, id))
       .returning()
+    await audit(c, targetStatus === 'scheduled' ? 'post.schedule' : 'post.publish', id, {
+      locale,
+      publishedAt: targetPublishedAt.toISOString(),
+    })
+
+    // Fire webhook fanout — subscribers branch on `event`. Sync delivery
+    // means the receiver's latency adds to ours; acceptable for low-volume
+    // events like publish. Skip for `scheduled` since the cron will fire
+    // a real `post.publish` when it promotes.
+    if (targetStatus === 'published') {
+      await emitEvent(c.var.db, {
+        event: 'post.publish',
+        payload: { id, locale, slug: tr.slug, title: tr.title, publishedAt: targetPublishedAt.toISOString() },
+        runId: c.req.header('x-agent-run-id') ?? undefined,
+      })
+    }
+
     return c.json(serialise(updated!), 200)
   },
 )
@@ -516,7 +658,7 @@ postsRouter.openapi(
     tags: ['Posts'],
     summary: 'Unpublish (status → draft)',
     security,
-    middleware: [requireRole(ROLES.EDITOR)] as const,
+    middleware: [requireRole(ROLES.EDITOR), requireScope("posts:write")] as const,
     request: { params: postIdParam },
     responses: {
       200: { description: 'OK', content: { 'application/json': { schema: PostSchema } } },
@@ -527,10 +669,16 @@ postsRouter.openapi(
     const { id } = c.req.valid('param')
     const [updated] = await c.var.db
       .update(posts)
-      .set({ status: 'draft', publishedAt: null, updatedAt: new Date() })
+      .set({
+        status: 'draft',
+        publishedAt: null,
+        updatedAt: new Date(),
+        version: sql`${posts.version} + 1`,
+      })
       .where(eq(posts.id, id))
       .returning()
     if (!updated) return c.json({ error: 'not_found' }, 404)
+    await audit(c, 'post.unpublish', id)
     return c.json(serialise(updated), 200)
   },
 )
@@ -568,7 +716,7 @@ postsRouter.openapi(
     tags: ['Translations'],
     summary: 'Upsert translation for locale (recomputes derived fields)',
     security,
-    middleware: [requireRole(ROLES.AUTHOR)] as const,
+    middleware: [requireRole(ROLES.AUTHOR), requireScope("posts:write")] as const,
     request: {
       params: postIdParam.extend({ locale: localeParam }),
       body: { content: { 'application/json': { schema: TranslationInput } } },

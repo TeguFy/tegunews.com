@@ -8,16 +8,17 @@ If you are an agent: start here. The system prompt for the project is in `CLAUDE
 
 ## Design principles
 
-| Principle | What it means in practice |
-|---|---|
-| **Slugs are the natural key, not UUIDs** | Agents operate on `(locale, slug)` pairs. UUIDs exist but are an internal detail. The `PUT /api/admin/posts/by-slug/{locale}/{slug}` endpoint is the canonical content-write path. |
-| **Idempotent by default** | Re-running the same call must be safe. `PUT by-slug` upserts; `POST /publish` is a no-op if already published; comment moderation can be re-applied. |
-| **Stable error codes** | API errors return `{ error: '<snake_case_code>', fields?: [...] }`. Agents branch on `.error`, never on the human message. The SDK throws `AgentSdkError` with `.code`. |
-| **Typed end-to-end** | `@teguns/db` types flow into `@teguns/api` (zod-openapi) into `@teguns/agent-sdk` (typed methods). Agents that consume the SDK get autocomplete + compile-time guarantees. |
-| **Discoverable** | Every API endpoint is in the OpenAPI doc at `/api/admin/openapi.json` with a Swagger UI at `/api/admin/docs`. No tribal knowledge required. |
-| **Audit by default** | Every state change goes through routes that write to `audit_log`. Agents debugging another agent's actions read this table, not git history. |
-| **Health before bulk** | Agents call `GET /api/health` before bulk operations. The endpoint returns 200 always; structured fields show partial outages. |
-| **Editorial guardrails** | Agents have role `agent` (peer of `author` for content). They cannot moderate comments, cannot manage users, cannot change settings. Comment moderation stays human. |
+| Principle                                  | What it means in practice                                                                                                                                                                                                       |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Slugs are the natural key, not UUIDs**   | Agents operate on `(locale, slug)` pairs. UUIDs exist but are an internal detail. The `PUT /api/admin/posts/by-slug/{locale}/{slug}` endpoint is the canonical content-write path.                                              |
+| **Idempotent by default**                  | Re-running the same call must be safe. `PUT by-slug` upserts; `POST /publish` is a no-op if already published; comment moderation can be re-applied.                                                                            |
+| **Stable error codes**                     | API errors return `{ error: '<snake_case_code>', fields?: [...] }`. Agents branch on `.error`, never on the human message. The SDK throws `AgentSdkError` with `.code`.                                                          |
+| **Typed end-to-end**                       | `@teguns/db` types flow into `@teguns/api` (zod-openapi) into `@teguns/agent-sdk` (typed methods). Agents that consume the SDK get autocomplete + compile-time guarantees.                                                       |
+| **Discoverable**                           | Every API endpoint is in the OpenAPI doc at `/api/admin/openapi.json` with a Swagger UI at `/api/admin/docs`. No tribal knowledge required.                                                                                     |
+| **Audit by default**                       | Every state change goes through routes that write to `audit_log`. Agents debugging another agent's actions read this table, not git history.                                                                                   |
+| **Health before bulk**                     | Agents call `GET /api/health` before bulk operations. The endpoint returns 200 always; structured fields show partial outages.                                                                                                  |
+| **Editorial guardrails**                   | Agents have role `agent` (peer of `author` for content). They cannot moderate comments, cannot manage users, cannot change settings. Comment moderation stays human.                                                            |
+| **Scope-narrow API keys**                  | Each key carries `scopes` (e.g. `posts:write`, `comments:moderate`). Routes enforce scope on top of role — leaked `posts:write` key cannot moderate comments even if the role allowed it.                                       |
 
 ## Authentication
 
@@ -88,6 +89,7 @@ Common codes the SDK and agent code should branch on:
 | `not_found` | 404 | Resource doesn't exist |
 | `seo_gate_failed` | 422 | Publish refused by SEO validators; `fields` says why |
 | `slug_taken` | 409 | Trying to create with a slug that already exists in another locale group |
+| `version_mismatch` | 409 | `If-Match` header didn't equal the current row's version — re-fetch + retry |
 | `comments_closed` | 403 | Article has comments disabled |
 | `depth_exceeded` | 403 | Reply nesting deeper than `MAX_COMMENT_DEPTH` |
 
@@ -144,7 +146,7 @@ This requires an `editor`+ key, not an `agent` key. Agent role intentionally can
 
 ## File layout for agents editing code
 
-```
+```text
 apps/web/                  Public site (RSC + middleware)
 apps/admin/                CMS + API surface (admin.tegunews.com)
 packages/db/               Drizzle schema — single source of truth for shapes
@@ -188,16 +190,61 @@ Skipping the SDK update is the most common mistake. Other agents use the SDK; th
 - `GET /api/health` — DB / KV / R2 reachability. Always 200; check `.ok`.
 - `wrangler tail tegunews-web` / `wrangler tail tegunews-admin` — live logs.
 - `audit_log` D1 table — every state change. Query it before suspecting "is this a bug or did another agent do it":
+
   ```sql
   SELECT created_at, user_id, action, resource_id FROM audit_log
   WHERE resource_id = ? ORDER BY created_at DESC LIMIT 20
   ```
 
-## Backlog (agent-first improvements not yet built)
+## Capability matrix
 
-- **Bulk endpoints** — `POST /api/admin/posts/bulk` for transactional imports of >1 article. Workaround: loop over `posts.upsert`.
-- **Webhook firehose** — `comment.submitted`, `post.published` events to a configured URL. Workaround: poll `audit_log`.
-- **Cron-job binding** — schedule recurring agent tasks via Worker cron triggers (`scheduled` handler in worker.ts). Not wired yet.
-- **Retry-with-jitter helper in the SDK** — currently agents implement their own. Cloudflare Workflows callers can rely on Workflow retry semantics instead.
-- **Scope enforcement** — API keys carry `scopes` but no route checks them yet (RBAC only checks role). Add scope-based guards before exposing keys to third parties.
-- **Soft-paywall** — once content is regularly stolen via human-driven scrape, add a per-IP article-quota challenge with Turnstile.
+| Capability                  | Status | Where                                                                |
+| --------------------------- | ------ | -------------------------------------------------------------------- |
+| Slug-keyed idempotent upsert | ✅    | `PUT /api/admin/posts/by-slug/{locale}/{slug}`                       |
+| Health probe                | ✅     | `GET /api/health`                                                    |
+| OpenAPI + Swagger UI        | ✅     | `/api/admin/openapi.json`, `/api/admin/docs`                         |
+| Stable error codes          | ✅     | `{ error, fields? }` everywhere                                      |
+| Audit log (write path)      | ✅     | Every mutation calls `audit(c, 'verb', id, metadata)`                |
+| Run-id propagation          | ✅     | `X-Agent-Run-Id` request header → `audit_log.metadata.runId`         |
+| Typed SDK                   | ✅     | `@teguns/agent-sdk`                                                  |
+| API-key role + scopes       | ✅     | `requireScope('posts:write')` etc.                                   |
+| API-key revocation          | ✅     | `pnpm tsx scripts/agents/revoke.ts --name "..."`                     |
+| Source attribution          | ✅     | `posts.originalSourceUrl`, `originalSourceName`, `bylineDisclosure`  |
+| Corrections (append-only)   | ✅     | `POST /api/admin/posts/{id}/corrections`                             |
+| Scheduled publish           | ✅     | `POST /publish?at=<ISO>` + `apps/cron/` worker promotes every minute |
+| Dry-run mode                | ✅     | `?dry_run=1` on upsert + publish                                     |
+| Optimistic lock             | ✅     | `If-Match: <version>` header on `PATCH /posts/{id}` → 409 on race    |
+| AI/scraper edge filter      | ✅     | `apps/web/middleware.ts`                                             |
+| View counter                | ✅     | `posts.viewCount` + `POST /api/track/view` (fire-and-forget)         |
+| Trending endpoint           | ✅     | `GET /api/admin/posts/trending` — engagement × recency               |
+| Bulk upsert helper          | ✅     | `client.posts.upsertMany(inputs, { concurrency: 4 })`                |
+| Media upload helper         | ✅     | `client.media.upload({ body, mimeType, altText })`                   |
+| Outbound webhook firehose   | ✅     | `webhook_subscriptions` + sync HMAC-signed POST on publish/approve   |
+| SDK retry-with-jitter       | ✅     | `createNewsClient({ retry: { attempts: 3 } })` — full-jitter backoff |
+| Idempotency-Key replay      | ✅     | KV-cached 2xx response keyed by `userId:key`; `X-Idempotent-Replay: true` on hit |
+| Diff-before-write           | ✅     | `diffPostUpsert(client, input)` — fetches current, returns delta     |
+| CI pipeline                 | ✅     | `.github/workflows/ci.yml` — type-check + test + schema drift check  |
+
+## Backlog (deferred, with workarounds)
+
+| Gap                          | Why deferred                                                                   | Workaround                                          |
+| ---------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------- |
+| **Durable webhook delivery** | Needs Workers Queues binding; sync ships acceptable for low-criticality fanout | Subscribers idempotent; replay from `audit_log`     |
+| **API-key revocation UI**    | CLI script handles it; UI is polish                                            | `pnpm tsx scripts/agents/revoke.ts --name "..."`    |
+| **Soft-paywall**             | No abuse signal yet                                                            | Tighten `RATE_LIMITER` if needed                    |
+
+## Scope catalog
+
+Scopes are case-sensitive. Wildcard `prefix:*` matches any same-prefix scope.
+
+| Scope                  | Grants                                                           |
+| ---------------------- | ---------------------------------------------------------------- |
+| `posts:write`          | Create / update / publish / unpublish / delete posts + translations |
+| `comments:moderate`    | Approve / spam / reject comments. Read the moderation queue.     |
+| `corrections:write`    | Append corrections (editor+ role still required)                 |
+| `webhooks:write`       | Register / delete outbound webhook subscriptions (admin role)    |
+| `taxonomy:write`       | Create / update / delete categories + tags (not yet enforced)    |
+| `media:write`          | Upload / delete media (not yet enforced)                         |
+| `admin:*`              | Wildcard for internal-admin agents                               |
+
+When minting an agent key, grant the **narrowest** set that lets it do its job. The "wire-importer" agent only needs `posts:write` — it doesn't need to moderate comments, even if its role would allow it.

@@ -70,6 +70,9 @@ async function tryResolveSession(c: Parameters<MiddlewareHandler<ApiEnv>>[0]): P
           userId: k.userId,
           expiresAt: Math.floor(Date.now() / 1000) + 60,
           user,
+          // Key carries declared scopes — `requireScope(...)` enforces them
+          // per route. Empty array = no scopes granted (valid auth, useless).
+          scopes: k.scopes ?? [],
         }
         return synthetic
       }

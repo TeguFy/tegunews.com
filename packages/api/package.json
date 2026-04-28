@@ -9,7 +9,13 @@
     "./routes/categories": "./src/routes/categories.ts",
     "./routes/tags": "./src/routes/tags.ts",
     "./routes/comments": "./src/routes/comments.ts",
-    "./routes/media": "./src/routes/media.ts"
+    "./routes/corrections": "./src/routes/corrections.ts",
+    "./routes/media": "./src/routes/media.ts",
+    "./routes/trending": "./src/routes/trending.ts",
+    "./routes/webhooks": "./src/routes/webhooks.ts",
+    "./cron": "./src/cron.ts",
+    "./webhook-emit": "./src/webhook-emit.ts",
+    "./middleware/idempotency": "./src/middleware/idempotency.ts"
   },
   "scripts": {
     "test": "vitest run --passWithNoTests",

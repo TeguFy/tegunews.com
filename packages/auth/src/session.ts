@@ -15,6 +15,13 @@ export interface ValidatedSession {
   userId: string
   expiresAt: number
   user: SessionUser
+  /**
+   * Scopes this principal is allowed to use. Cookie/Bearer sessions get
+   * `null` (full role-based access). API-key principals get the key's
+   * declared scope list — routes that call `requireScope(...)` reject
+   * keys missing the scope, even if the role would otherwise allow it.
+   */
+  scopes: string[] | null
 }
 
 interface SessionRow {
@@ -70,5 +77,6 @@ export async function validateSession(
     userId: session.userId,
     expiresAt: session.expiresAt,
     user: session.user,
+    scopes: null,    // cookie/Bearer sessions are not scope-limited
   }
 }

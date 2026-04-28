@@ -7,7 +7,11 @@ import { postsRouter } from '@teguns/api/routes/posts'
 import { categoriesRouter } from '@teguns/api/routes/categories'
 import { tagsRouter } from '@teguns/api/routes/tags'
 import { commentsRouter } from '@teguns/api/routes/comments'
+import { correctionsRouter } from '@teguns/api/routes/corrections'
 import { mediaRouter } from '@teguns/api/routes/media'
+import { trendingRouter } from '@teguns/api/routes/trending'
+import { webhooksRouter } from '@teguns/api/routes/webhooks'
+import { idempotencyMiddleware } from '@teguns/api/middleware/idempotency'
 import { createDb } from '@teguns/db'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 
@@ -17,15 +21,24 @@ app.use('/api/admin/*', async (c, next) => {
   const { env } = await getCloudflareContext({ async: true })
   c.env.DB = env.DB as unknown as D1Database
   c.env.MEDIA = env.MEDIA as unknown as R2Bucket
+  c.env.CACHE = env.CACHE as unknown as KVNamespace
   c.set('db', createDb(env.DB))
   await next()
 })
 
+// Idempotency-Key support — replays cached 2xx response on duplicate calls
+// with the same key + userId. Mutations only; GET/HEAD passthrough.
+app.use('/api/admin/*', idempotencyMiddleware)
+
 app.route('/api/admin/posts', postsRouter)
+// Corrections + trending share the /posts prefix (sub-paths under /posts/...).
+app.route('/api/admin/posts', correctionsRouter)
+app.route('/api/admin/posts', trendingRouter)
 app.route('/api/admin/categories', categoriesRouter)
 app.route('/api/admin/tags', tagsRouter)
 app.route('/api/admin/comments', commentsRouter)
 app.route('/api/admin/media', mediaRouter)
+app.route('/api/admin/webhooks', webhooksRouter)
 
 export const GET = app.fetch
 export const POST = app.fetch

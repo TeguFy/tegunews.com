@@ -9,6 +9,7 @@ import {
 import { JsonLd } from '@/components/json-ld'
 import { Comments } from '@/components/comments/comments'
 import { ShareButtons } from '@/components/share-buttons'
+import { ViewTracker } from '@/components/view-tracker'
 import { fetchArticleBySlug, fetchRelatedArticles } from '@/lib/posts'
 import { ArticleCard } from '@/components/article-card'
 
@@ -68,6 +69,7 @@ export default async function ArticlePage({ params }: Props) {
   return (
     <article className="mx-auto max-w-3xl px-4 py-10">
       <JsonLd data={[articleSchema, breadcrumb]} />
+      <ViewTracker postId={post.id} />
 
       {category && (
         <a

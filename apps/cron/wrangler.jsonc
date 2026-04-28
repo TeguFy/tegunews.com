@@ -1,0 +1,23 @@
+{
+  "name": "tegunews-cron",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-04-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  // Cron triggers — one minute granularity is the finest CF supports. Multiple
+  // entries fire the same `scheduled` handler with different `event.cron`
+  // values; switch on it inside the handler to route.
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tegunews",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+    }
+  ]
+}

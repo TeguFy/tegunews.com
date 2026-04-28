@@ -18,7 +18,9 @@ import { and, asc, count, desc, eq, sql } from 'drizzle-orm'
 import { comments, posts } from '@teguns/db'
 import { ROLES } from '@teguns/auth'
 import { authMiddleware, optionalAuth } from '../middleware/auth'
-import { requireRole } from '../middleware/rbac'
+import { requireRole, requireScope } from "../middleware/rbac"
+import { audit } from '../audit'
+import { emitEvent } from '../webhook-emit'
 import {
   classifyComment,
   renderCommentBody,
@@ -235,7 +237,7 @@ commentsRouter.openapi(
     tags: ['Moderation'],
     summary: 'List comments awaiting moderation',
     security,
-    middleware: [authMiddleware, requireRole(ROLES.EDITOR)] as const,
+    middleware: [authMiddleware, requireRole(ROLES.EDITOR), requireScope("comments:moderate")] as const,
     request: {
       query: z.object({
         status: z.enum(['pending', 'approved', 'spam', 'rejected']).default('pending'),
@@ -276,7 +278,7 @@ commentsRouter.openapi(
     tags: ['Moderation'],
     summary: 'Moderate a comment',
     security,
-    middleware: [authMiddleware, requireRole(ROLES.EDITOR)] as const,
+    middleware: [authMiddleware, requireRole(ROLES.EDITOR), requireScope("comments:moderate")] as const,
     request: {
       params: z.object({ id: z.uuid().openapi({ param: { name: 'id', in: 'path' } }) }),
       body: { content: { 'application/json': { schema: ModerateInput } } },
@@ -318,6 +320,21 @@ commentsRouter.openapi(
       await c.var.db.update(posts).set({ commentCount: sql`${posts.commentCount} + 1` }).where(eq(posts.id, existing.postId))
     } else if (wasApproved && !isApproved) {
       await c.var.db.update(posts).set({ commentCount: sql`MAX(0, ${posts.commentCount} - 1)` }).where(eq(posts.id, existing.postId))
+    }
+
+    await audit(c, `comment.${action}`, id, { postId: existing.postId, prevStatus: existing.status })
+
+    if (action === 'approve') {
+      await emitEvent(c.var.db, {
+        event: 'comment.approve',
+        payload: {
+          id,
+          postId: existing.postId,
+          authorName: existing.authorName,
+          bodyHtml: existing.bodyHtml,
+        },
+        runId: c.req.header('x-agent-run-id') ?? undefined,
+      })
     }
 
     return c.json(serialiseForPublic(updated!), 200)
