@@ -59,6 +59,14 @@ export default async function PostsPage({ searchParams }: Props) {
       <PageHeader
         title="Articles"
         description={`${counts.all} total — ${counts.published} published, ${counts.draft} draft, ${counts.scheduled} scheduled.`}
+        actions={
+          <Link
+            href="/posts/new"
+            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800"
+          >
+            + New article
+          </Link>
+        }
       />
 
       <nav className="mb-6 flex gap-2 border-b border-zinc-200 text-sm">
@@ -105,7 +113,12 @@ export default async function PostsPage({ searchParams }: Props) {
                 return (
                   <tr key={`${r.id}-${r.locale ?? 'none'}`} className="hover:bg-zinc-50">
                     <td className="max-w-md truncate px-4 py-2.5">
-                      <span className="font-medium text-zinc-900">{r.title ?? <em className="text-zinc-400">untitled</em>}</span>
+                      <Link
+                        href={`/posts/${r.id}/edit${r.locale ? `?locale=${r.locale}` : ''}`}
+                        className="font-medium text-zinc-900 hover:underline"
+                      >
+                        {r.title ?? <em className="text-zinc-400">untitled</em>}
+                      </Link>
                       {r.featured && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">Featured</span>}
                       {isBreaking && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-red-800">Breaking</span>}
                       {r.slug && <p className="truncate font-mono text-xs text-zinc-500">/{r.locale}/news/{r.slug}</p>}

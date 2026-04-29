@@ -2,6 +2,7 @@ import { desc } from 'drizzle-orm'
 import { media } from '@teguns/db'
 import { getDb } from '@/lib/db'
 import { PageHeader } from '@/components/page-header'
+import { MediaUploadForm } from '@/components/media/upload-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,8 +14,12 @@ export default async function MediaPage() {
     <>
       <PageHeader
         title="Media"
-        description={`${rows.length} item${rows.length === 1 ? '' : 's'}. Upload via SDK or POST /api/admin/media (multipart).`}
+        description={`${rows.length} item${rows.length === 1 ? '' : 's'} in R2.`}
       />
+
+      <div className="mb-6">
+        <MediaUploadForm />
+      </div>
 
       {rows.length === 0 ? (
         <div className="rounded-md border border-dashed border-zinc-200 bg-white p-8 text-center text-sm text-zinc-600">

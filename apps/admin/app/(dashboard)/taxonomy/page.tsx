@@ -1,7 +1,8 @@
-import { asc, eq, count } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { categories, tags, posts, postTags } from '@teguns/db'
 import { getDb } from '@/lib/db'
 import { PageHeader } from '@/components/page-header'
+import { TaxonomyCreateForm } from '@/components/taxonomy/create-form'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +41,9 @@ export default async function TaxonomyPage() {
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-zinc-700">Categories</h2>
+          <div className="mb-3">
+            <TaxonomyCreateForm kind="category" />
+          </div>
           <div className="overflow-hidden rounded-md border border-zinc-200 bg-white">
             <ul className="divide-y divide-zinc-100">
               {cats.map((c) => (
@@ -65,6 +69,9 @@ export default async function TaxonomyPage() {
 
         <section>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-zinc-700">Tags</h2>
+          <div className="mb-3">
+            <TaxonomyCreateForm kind="tag" />
+          </div>
           <div className="overflow-hidden rounded-md border border-zinc-200 bg-white">
             <ul className="divide-y divide-zinc-100">
               {tgs.map((t) => (
