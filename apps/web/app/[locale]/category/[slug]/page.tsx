@@ -24,16 +24,20 @@ export default async function CategoryPage({ params }: Props) {
   if (!result) notFound()
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
-      <header className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Category</p>
-        <h1 className="mt-1 text-3xl font-extrabold tracking-tight">{result.category.name}</h1>
+    <main className="mx-auto max-w-6xl px-4 py-12">
+      <header className="mb-10 border-b border-border pb-8">
+        <p className="kicker text-primary">Category</p>
+        <h1 className="mt-2 font-serif text-4xl font-extrabold tracking-tight md:text-5xl">
+          {result.category.name}
+        </h1>
         {result.category.description && (
-          <p className="mt-2 text-muted-foreground">{result.category.description}</p>
+          <p className="mt-3 max-w-2xl font-serif text-lg italic text-muted-foreground">
+            {result.category.description}
+          </p>
         )}
       </header>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
         {result.posts.map((p) => (
           <ArticleCard key={p.id} locale={locale} article={p} />
         ))}

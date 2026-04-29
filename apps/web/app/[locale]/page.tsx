@@ -27,29 +27,29 @@ export default async function HomePage({ params }: Props) {
     <>
       <JsonLd data={[generateWebsiteSchema(BASE_URL), generateOrganizationSchema(BASE_URL)]} />
 
-      <section className="border-b">
-        <div className="mx-auto max-w-6xl px-4 py-10">
-          <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">{tSite('name')}</h1>
-          <p className="mt-2 max-w-2xl text-muted-foreground">{tSite('tagline')}</p>
+      <section className="border-b border-border bg-gradient-to-b from-muted/40 to-transparent">
+        <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
+          <h1 className="font-serif text-4xl font-extrabold leading-[1.05] tracking-tight md:text-6xl">
+            {tSite('name')}
+          </h1>
+          <p className="mt-3 max-w-2xl font-serif text-lg italic text-muted-foreground md:text-xl">
+            {tSite('tagline')}
+          </p>
         </div>
       </section>
 
-      <main className="mx-auto max-w-6xl px-4 py-10">
+      <main className="mx-auto max-w-6xl px-4 py-12">
         {lede && (
-          <section className="mb-12">
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              {tHome('featured')}
-            </h2>
+          <section className="mb-14">
+            <SectionLabel>{tHome('featured')}</SectionLabel>
             <ArticleCard locale={locale} article={lede} variant="lede" />
           </section>
         )}
 
         {rest.length > 0 && (
           <section>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              {tHome('latest')}
-            </h2>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <SectionLabel>{tHome('latest')}</SectionLabel>
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
               {rest.map((p) => (
                 <ArticleCard key={p.id} locale={locale} article={p} />
               ))}
@@ -58,5 +58,14 @@ export default async function HomePage({ params }: Props) {
         )}
       </main>
     </>
+  )
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mb-6 flex items-center gap-3">
+      <span className="kicker text-foreground/70">{children}</span>
+      <span className="h-px flex-1 bg-border" aria-hidden />
+    </div>
   )
 }

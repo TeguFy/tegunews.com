@@ -67,64 +67,61 @@ export default async function ArticlePage({ params }: Props) {
   const isBreaking = post.breakingUntil && post.breakingUntil > new Date()
 
   return (
-    <article className="mx-auto max-w-3xl px-4 py-10">
+    <article className="mx-auto max-w-3xl px-4 py-12">
       <JsonLd data={[articleSchema, breadcrumb]} />
       <ViewTracker postId={post.id} />
 
-      {category && (
-        <a
-          href={`/${locale}/category/${category.slug}`}
-          className="text-xs font-semibold uppercase tracking-[0.18em] text-primary"
-        >
-          {category.name}
-        </a>
-      )}
-
-      <h1 className="mt-2 text-3xl font-extrabold tracking-tight md:text-4xl">
-        {translation.title}
-      </h1>
-
-      {translation.excerpt && (
-        <p className="mt-3 text-lg leading-relaxed text-muted-foreground">
-          {translation.excerpt}
-        </p>
-      )}
-
-      <div className="mt-6 flex items-center gap-3 text-sm text-muted-foreground">
-        {post.authorName && <span>{t('byAuthor', { name: post.authorName })}</span>}
-        {post.publishedAt && (
-          <>
-            <span aria-hidden>·</span>
-            <time dateTime={post.publishedAt.toISOString()}>
-              {post.publishedAt.toLocaleDateString(locale, { dateStyle: 'long' })}
-            </time>
-          </>
+      <header className="text-center">
+        {category && (
+          <a
+            href={`/${locale}/category/${category.slug}`}
+            className="kicker text-primary hover:underline"
+          >
+            {category.name}
+          </a>
         )}
-        {post.readingTime && (
-          <>
-            <span aria-hidden>·</span>
-            <span>{t('readingTime', { minutes: post.readingTime })}</span>
-          </>
-        )}
-        {isBreaking && (
-          <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-primary-foreground">
-            BREAKING
-          </span>
-        )}
-      </div>
 
-      <ShareButtons
-        url={url}
-        title={translation.title}
-        summary={translation.excerpt ?? translation.seoDesc ?? undefined}
-        className="mt-6"
-      />
+        <h1 className="mt-3 font-serif text-[2.1rem] font-extrabold leading-[1.1] tracking-tight md:text-5xl">
+          {translation.title}
+        </h1>
 
-      <hr className="mt-6 border-border" />
+        {translation.excerpt && (
+          <p className="mx-auto mt-5 max-w-2xl font-serif text-lg italic leading-relaxed text-muted-foreground md:text-xl">
+            {translation.excerpt}
+          </p>
+        )}
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+          {post.authorName && (
+            <span className="font-medium text-foreground/80">{t('byAuthor', { name: post.authorName })}</span>
+          )}
+          {post.publishedAt && (
+            <>
+              <span aria-hidden className="text-border">•</span>
+              <time dateTime={post.publishedAt.toISOString()}>
+                {post.publishedAt.toLocaleDateString(locale, { dateStyle: 'long' })}
+              </time>
+            </>
+          )}
+          {post.readingTime && (
+            <>
+              <span aria-hidden className="text-border">•</span>
+              <span>{t('readingTime', { minutes: post.readingTime })}</span>
+            </>
+          )}
+          {isBreaking && (
+            <span className="rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-primary-foreground">
+              Breaking
+            </span>
+          )}
+        </div>
+      </header>
+
+      <hr className="mx-auto mt-8 w-24 border-t-2 border-foreground/20" />
 
       {post.featuredImage && (
-        <figure className="mt-8 overflow-hidden rounded-lg">
-          <div className="relative aspect-video">
+        <figure className="mt-10 overflow-hidden">
+          <div className="relative aspect-video overflow-hidden rounded-xl">
             <Image
               src={post.featuredImage}
               alt={post.featuredImageAlt ?? translation.title}
@@ -135,7 +132,7 @@ export default async function ArticlePage({ params }: Props) {
             />
           </div>
           {post.featuredImageCredit && (
-            <figcaption className="mt-2 text-xs text-muted-foreground">
+            <figcaption className="mt-2 text-center text-xs italic text-muted-foreground">
               {post.featuredImageCredit}
             </figcaption>
           )}
@@ -143,11 +140,11 @@ export default async function ArticlePage({ params }: Props) {
       )}
 
       <div
-        className="prose-news mt-8 max-w-none"
+        className="prose-news mt-10 max-w-none"
         dangerouslySetInnerHTML={{ __html: translation.content }}
       />
 
-      <div className="mt-10 flex items-center justify-between border-t border-border pt-6">
+      <div className="mt-12 border-t border-border pt-6">
         <ShareButtons
           url={url}
           title={translation.title}
@@ -156,11 +153,12 @@ export default async function ArticlePage({ params }: Props) {
       </div>
 
       {related.length > 0 && (
-        <section className="mt-16 border-t pt-8">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            More from {category?.name ?? 'this section'}
-          </h2>
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <section className="mt-16 border-t border-border pt-10">
+          <div className="mb-6 flex items-center gap-3">
+            <span className="kicker text-foreground/70">More from {category?.name ?? 'this section'}</span>
+            <span className="h-px flex-1 bg-border" aria-hidden />
+          </div>
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             {related.map((r) => (
               <ArticleCard key={r.id} locale={locale} article={r} />
             ))}
@@ -168,7 +166,7 @@ export default async function ArticlePage({ params }: Props) {
         </section>
       )}
 
-      <section className="mt-16 border-t pt-8">
+      <section className="mt-16 border-t border-border pt-10">
         <Comments
           postId={post.id}
           locale={locale}

@@ -14,8 +14,8 @@ export function Footer({ locale }: Props) {
       <div className="mx-auto max-w-6xl px-4 py-10">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           <div className="col-span-2">
-            <p className="font-extrabold tracking-tight">{tSite('name')}</p>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground">{t('tagline')}</p>
+            <p className="font-serif text-xl font-extrabold tracking-tight">{tSite('name')}</p>
+            <p className="mt-2 max-w-md font-serif italic text-muted-foreground">{t('tagline')}</p>
           </div>
 
           <div>
