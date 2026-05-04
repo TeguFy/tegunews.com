@@ -6,6 +6,7 @@ import { getDb } from '@/lib/db'
 import { PageHeader } from '@/components/page-header'
 import { PostForm } from '@/components/posts/post-form'
 import { PostActions } from '@/components/posts/post-actions'
+import { PostDiscussionPanel } from '@/components/posts/post-discussion-panel'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,7 +81,9 @@ export default async function EditPostPage({ params, searchParams }: Props) {
           <code className="rounded bg-white px-1 py-0.5">PUT /api/admin/posts/by-slug/&#123;locale&#125;/&#123;slug&#125;</code>
         </div>
       ) : (
-        <PostForm
+        <>
+          <PostDiscussionPanel postId={id} locale={tr.locale} />
+          <PostForm
           isCreate={false}
           categories={cats}
           initial={{
@@ -102,6 +105,7 @@ export default async function EditPostPage({ params, searchParams }: Props) {
             bylineDisclosure: (post.bylineDisclosure as never) ?? undefined,
           }}
         />
+        </>
       )}
     </>
   )

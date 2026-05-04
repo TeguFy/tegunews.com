@@ -57,6 +57,28 @@
     "copied": "Đã sao chép",
     "native": "Chia sẻ…"
   },
+  "listing": {
+    "sort": "Sắp xếp",
+    "sortLatest": "Mới nhất",
+    "sortOldest": "Cũ nhất",
+    "sortPopular": "Đọc nhiều tuần này",
+    "time": "Thời gian",
+    "timeAll": "Mọi thời điểm",
+    "timeWeek": "Tuần qua",
+    "timeMonth": "Tháng qua",
+    "timeYear": "Năm qua",
+    "showing": "{from}–{to} trong {total}",
+    "empty": "Chưa có bài viết nào.",
+    "emptyHint": "Quay lại sau, hoặc xem trang chủ.",
+    "backHome": "Về trang chủ",
+    "previous": "Trước",
+    "next": "Sau",
+    "first": "Đầu",
+    "last": "Cuối",
+    "page": "Trang {current}/{total}",
+    "pageLabel": "Phân trang",
+    "goToPage": "Đến trang {page}"
+  },
   "footer": {
     "browse": "Khám phá",
     "company": "Công ty",

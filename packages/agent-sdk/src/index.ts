@@ -85,6 +85,74 @@ interface Comment {
   createdAt: string
 }
 
+interface Persona {
+  id: string
+  userId: string
+  slug: string
+  displayName: string
+  avatarUrl: string | null
+  bio: string | null
+  personalityTraits: string[]
+  tone: 'formal' | 'casual' | 'sarcastic' | 'enthusiastic' | 'analytical' | 'skeptical'
+  politicalLeaning: 'left' | 'center-left' | 'center' | 'center-right' | 'right' | 'apolitical' | null
+  expertiseAreas: string[]
+  writingStyle: string | null
+  languagePreference: string[]
+  systemPrompt: string | null
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreatePersonaInput {
+  slug: string
+  displayName: string
+  avatarUrl?: string | null
+  bio?: string | null
+  personalityTraits?: string[]
+  tone?: Persona['tone']
+  politicalLeaning?: Persona['politicalLeaning']
+  expertiseAreas?: string[]
+  writingStyle?: string | null
+  languagePreference?: string[]
+  systemPrompt?: string | null
+  active?: boolean
+}
+
+interface ConversationRun {
+  id: string
+  postId: string
+  locale: string
+  status: 'queued' | 'running' | 'completed' | 'failed'
+  triggeredBy: 'auto_publish' | 'manual' | 'scheduled' | 'retry'
+  triggeredByUserId: string | null
+  personaIds: string[]
+  commentIds: string[]
+  depth: number
+  model: string | null
+  error: string | null
+  retries: number
+  createdAt: string
+  completedAt: string | null
+}
+
+export interface GenerateConversationInput {
+  locale?: string
+  personaIds?: string[]
+  depth?: 1 | 2 | 3
+  topLevelCount?: number
+  model?: string
+  dryRun?: boolean
+}
+
+export interface GenerateConversationResult {
+  runId: string
+  status: string
+  commentIds: string[]
+  skipped: Array<{ stage: string; reason: string }>
+  preview?: Array<{ persona: string; body: string; replyTo?: string }>
+}
+
 export interface UpsertPostInput {
   locale: string
   slug: string
@@ -414,6 +482,42 @@ export function createNewsClient(opts: ClientOptions) {
       /** Editor+ only. */
       moderate(id: string, action: 'approve' | 'spam' | 'reject'): Promise<Comment> {
         return request('POST', `/api/admin/comments/${id}/moderate`, { action })
+      },
+    },
+
+    personas: {
+      list(opts?: { active?: boolean }): Promise<{ items: Persona[] }> {
+        const q = new URLSearchParams()
+        if (opts?.active !== undefined) q.set('active', opts.active ? '1' : '0')
+        const qs = q.toString()
+        return request('GET', `/api/admin/personas${qs ? `?${qs}` : ''}`)
+      },
+      get(id: string): Promise<Persona> {
+        return request('GET', `/api/admin/personas/${id}`)
+      },
+      create(input: CreatePersonaInput): Promise<Persona> {
+        return request('POST', '/api/admin/personas', input)
+      },
+      update(id: string, input: Partial<CreatePersonaInput>): Promise<Persona> {
+        return request('PATCH', `/api/admin/personas/${id}`, input)
+      },
+      /** Soft-disable by default. Pass { hard: true } to actually delete (cascades comments). */
+      delete(id: string, opts?: { hard?: boolean }): Promise<void> {
+        const q = opts?.hard ? '?hard=1' : ''
+        return request('DELETE', `/api/admin/personas/${id}${q}`)
+      },
+    },
+
+    conversations: {
+      /** Idempotent for triggeredBy: 'auto_publish' — re-runs no-op once a completed run exists. Manual triggers always run. */
+      generate(postId: string, input?: GenerateConversationInput): Promise<GenerateConversationResult> {
+        return request('POST', `/api/admin/posts/${postId}/generate-conversation`, input ?? {})
+      },
+      runs(postId: string, opts?: { locale?: string }): Promise<{ items: ConversationRun[] }> {
+        const q = new URLSearchParams()
+        if (opts?.locale) q.set('locale', opts.locale)
+        const qs = q.toString()
+        return request('GET', `/api/admin/posts/${postId}/conversation-runs${qs ? `?${qs}` : ''}`)
       },
     },
   }

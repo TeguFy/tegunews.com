@@ -13,6 +13,9 @@
     "./routes/media": "./src/routes/media.ts",
     "./routes/trending": "./src/routes/trending.ts",
     "./routes/webhooks": "./src/routes/webhooks.ts",
+    "./routes/agent-personas": "./src/routes/agent-personas.ts",
+    "./routes/agent-conversations": "./src/routes/agent-conversations.ts",
+    "./agent-conversation/generator": "./src/agent-conversation/generator.ts",
     "./cron": "./src/cron.ts",
     "./webhook-emit": "./src/webhook-emit.ts",
     "./middleware/idempotency": "./src/middleware/idempotency.ts"

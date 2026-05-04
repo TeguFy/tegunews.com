@@ -32,6 +32,10 @@
       "preview_id": "23693b67b9e84c6ebb53f567a078f352"
     }
   ],
+  // Workers AI — used by the agent-conversation generator to produce
+  // persona-voiced comments. Llama-3.3-70b-fp8-fast is the default model;
+  // override per-run by passing `model` to the generator.
+  "ai": { "binding": "AI" },
   "vars": {
     "NEXT_PUBLIC_APP_URL": "https://admin.tegunews.com",
     "WEB_APP_URL": "https://tegunews.com"

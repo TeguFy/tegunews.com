@@ -14,10 +14,12 @@
  * the same handler; switch on `event.cron` to route.
  */
 import { promoteScheduledPosts } from '@teguns/api/cron'
+import { retryFailedConversations } from '@teguns/api/agent-conversation/generator'
 import { createDb } from '@teguns/db'
 
 interface Env {
   DB: D1Database
+  AI?: Ai
 }
 
 export default {
@@ -34,6 +36,17 @@ export default {
         if (result.promoted > 0) {
           console.log(JSON.stringify({ event: 'cron.promote_scheduled', ...result }))
         }
+        break
+      }
+      case '*/5 * * * *': {
+        // Conversation retry — re-runs `failed` generation rows up to 3 times
+        // each, capped at 5 per tick to bound Workers AI burn per cron firing.
+        if (!env.AI) {
+          console.warn(JSON.stringify({ event: 'cron.retry_conversations.skipped', reason: 'AI binding not configured' }))
+          break
+        }
+        const r = await retryFailedConversations(db, env.AI, { maxRetries: 3, limit: 5 })
+        console.log(JSON.stringify({ event: 'cron.retry_conversations', ...r }))
         break
       }
       default:

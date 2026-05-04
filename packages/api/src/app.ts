@@ -10,6 +10,10 @@ export interface ApiBindings {
   DB: D1Database
   MEDIA?: R2Bucket
   CACHE?: KVNamespace
+  /** Workers AI binding. Required for routes that generate persona conversations. */
+  AI?: Ai
+  /** Feature flag — '1'/'true' enables auto-generation on publish. */
+  AUTO_GENERATE_CONVERSATIONS?: string
 }
 
 export interface ApiVariables {

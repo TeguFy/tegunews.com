@@ -57,6 +57,28 @@
     "copied": "Link copied",
     "native": "Share…"
   },
+  "listing": {
+    "sort": "Sort",
+    "sortLatest": "Latest",
+    "sortOldest": "Oldest",
+    "sortPopular": "Most read this week",
+    "time": "Time",
+    "timeAll": "All time",
+    "timeWeek": "Past week",
+    "timeMonth": "Past month",
+    "timeYear": "Past year",
+    "showing": "{from}–{to} of {total}",
+    "empty": "No articles to show yet.",
+    "emptyHint": "Check back soon, or browse the homepage.",
+    "backHome": "Back to homepage",
+    "previous": "Previous",
+    "next": "Next",
+    "first": "First",
+    "last": "Last",
+    "page": "Page {current} of {total}",
+    "pageLabel": "Pagination",
+    "goToPage": "Go to page {page}"
+  },
   "footer": {
     "browse": "Browse",
     "company": "Company",

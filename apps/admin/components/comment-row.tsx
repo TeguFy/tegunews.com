@@ -16,6 +16,7 @@ interface CommentRowProps {
     locale: string | null
     postTitle: string | null
     postSlug: string | null
+    isAiGenerated?: boolean
   }
 }
 
@@ -48,6 +49,11 @@ export function CommentRow({ comment: c }: CommentRowProps) {
       <header className="mb-2 flex items-center justify-between gap-3 text-xs">
         <div>
           <span className="font-semibold text-zinc-900">{c.authorName}</span>
+          {c.isAiGenerated && (
+            <span className="ml-2 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-violet-800">
+              🤖 AI
+            </span>
+          )}
           {c.authorWebsite && (
             <a href={c.authorWebsite} className="ml-2 text-blue-600 underline" target="_blank" rel="ugc nofollow noopener">
               site

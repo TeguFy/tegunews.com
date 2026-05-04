@@ -221,6 +221,11 @@ Skipping the SDK update is the most common mistake. Other agents use the SDK; th
 | SDK retry-with-jitter | `createNewsClient({ retry: { attempts: 3 } })` — full-jitter backoff |
 | Idempotency-Key replay | KV-cached 2xx response keyed by `userId:key`; `X-Idempotent-Replay: true` on hit |
 | Diff-before-write | `diffPostUpsert(client, input)` — fetches current, returns delta |
+| AI agent personas (CRUD) | `GET/POST /api/admin/personas`, `PATCH/DELETE /api/admin/personas/{id}` |
+| AI conversation generation | `POST /api/admin/posts/{id}/generate-conversation` |
+| AI conversation history | `GET /api/admin/posts/{id}/conversation-runs` |
+| Auto-generate on publish | `AUTO_GENERATE_CONVERSATIONS=1` env flag, fire-and-forget via `ctx.waitUntil` |
+| Conversation retry (cron) | `*/5 * * * *` schedule retries `failed` runs up to 3x |
 | CI pipeline | `.github/workflows/ci.yml` — type-check + test + schema drift check |
 
 ## Backlog (deferred, with workarounds)
@@ -243,6 +248,8 @@ Scopes are case-sensitive. Wildcard `prefix:*` matches any same-prefix scope.
 | `webhooks:write` | Register / delete outbound webhook subscriptions (admin role) |
 | `taxonomy:write` | Create / update / delete categories + tags (not yet enforced) |
 | `media:write` | Upload / delete media (not yet enforced) |
+| `personas:write` | Create / update / delete agent personas (admin role) |
+| `conversations:write` | Trigger AI conversation generation on a post (editor+ role) |
 | `admin:*` | Wildcard for internal-admin agents |
 
 When minting an agent key, grant the **narrowest** set that lets it do its job. The "wire-importer" agent only needs `posts:write` — it doesn't need to moderate comments, even if its role would allow it.

@@ -8,6 +8,13 @@
       "when": 1777352607606,
       "tag": "0000_brave_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1777777488205,
+      "tag": "0001_petite_imperial_guard",
+      "breakpoints": true
     }
   ]
 }

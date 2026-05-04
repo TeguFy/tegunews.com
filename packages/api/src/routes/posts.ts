@@ -24,6 +24,7 @@ import { authMiddleware } from '../middleware/auth'
 import { requireRole, requireScope } from '../middleware/rbac'
 import { audit } from '../audit'
 import { emitEvent } from '../webhook-emit'
+import { generateConversation } from '../agent-conversation/generator'
 import type { ApiEnv } from '../app'
 
 export const postsRouter = new OpenAPIHono<ApiEnv>()
@@ -654,6 +655,40 @@ postsRouter.openapi(
         payload: { id, locale, slug: tr.slug, title: tr.title, publishedAt: targetPublishedAt.toISOString() },
         runId: c.req.header('x-agent-run-id') ?? undefined,
       })
+
+      // Auto-generate AI persona discussion. Gated by env flag — not every
+      // deployment wants this on. AI binding may be absent in some envs
+      // (e.g. preview without Workers AI), in which case we silently skip
+      // — we'd rather miss seeded comments than 500 the publish.
+      //
+      // executionCtx().waitUntil keeps the response fast (~LLM calls take
+      // 5–30s) while still letting the worker complete the job. The
+      // generator itself is idempotent — re-running on the same (post,
+      // locale) is a no-op once a `completed` run exists.
+      const flag = c.env.AUTO_GENERATE_CONVERSATIONS
+      if (flag === '1' || flag === 'true') {
+        if (c.env.AI) {
+          const ai = c.env.AI
+          const db = c.var.db
+          const work = generateConversation(db, ai, {
+            postId: id,
+            locale,
+            triggeredBy: 'auto_publish',
+            triggeredByUserId: c.var.userId,
+          }).catch((err) => {
+            // Swallow — the run row records `failed`; cron will retry.
+            console.warn(JSON.stringify({ event: 'conversation.auto_generate_failed', postId: id, locale, error: String(err) }))
+          })
+          try {
+            c.executionCtx.waitUntil(work)
+          } catch {
+            // No execution context (e.g. tests) — let it run synchronously.
+            await work
+          }
+        } else {
+          console.warn(JSON.stringify({ event: 'conversation.auto_generate_skipped', reason: 'ai_binding_missing', postId: id }))
+        }
+      }
     }
 
     return c.json(serialise(updated!), 200)

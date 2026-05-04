@@ -25,6 +25,10 @@ const SECTIONS: NavSection[] = [
       { href: '/settings', label: 'Settings' },
     ],
   },
+  {
+    title: 'AI',
+    items: [{ href: '/personas', label: 'Personas' }],
+  },
 ]
 
 export function SidebarNav() {

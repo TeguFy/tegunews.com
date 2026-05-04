@@ -11,7 +11,7 @@
   // entries fire the same `scheduled` handler with different `event.cron`
   // values; switch on it inside the handler to route.
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": ["* * * * *", "*/5 * * * *"]
   },
   "d1_databases": [
     {
@@ -19,5 +19,8 @@
       "database_name": "tegunews",
       "database_id": "ba8b76be-8fbf-4716-a6b4-2e22f34f1d90"
     }
-  ]
+  ],
+  // Workers AI — needed for the conversation-retry cron task that re-runs
+  // failed generation attempts.
+  "ai": { "binding": "AI" }
 }

@@ -48,6 +48,14 @@ export const comments = sqliteTable(
     spamScore: integer('spam_score'),              // 0-100 from the spam check
     upvotes: integer('upvotes').notNull().default(0),
     locale: text('locale'),                         // matches the article translation locale
+    // True when the comment was authored by an AI agent persona (see
+    // `agent_personas`). Set at insert time so the public renderer can show a
+    // "🤖 AI persona" badge — non-negotiable disclosure for reader trust.
+    isAiGenerated: integer('is_ai_generated', { mode: 'boolean' }).notNull().default(false),
+    // Foreign key into conversation_runs — null for human/guest comments,
+    // populated for comments created by a generation run. Lets us trace a
+    // discussion back to the run that produced it (and bulk-revert if needed).
+    conversationRunId: text('conversation_run_id'),
     createdAt: integer('created_at', { mode: 'timestamp' })
       .notNull()
       .default(sql`(unixepoch())`),

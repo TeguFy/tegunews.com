@@ -1,27 +1,97 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { fetchArticlesByCategory } from '@/lib/posts'
-import { ArticleCard } from '@/components/article-card'
+import { fetchCategoryListing } from '@/lib/posts'
+import { ArticleListing } from '@/components/listing/article-listing'
+import { parseListingParams, flattenSearchParams } from '@/components/listing/params'
 
-export const revalidate = 600
+const PER_PAGE = 12
 
 interface Props {
   params: Promise<{ locale: string; slug: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }
 
-export async function generateMetadata({ params }: Props) {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { locale, slug } = await params
-  const result = await fetchArticlesByCategory(locale, slug, 1)
+  const sp = await searchParams
+  const parsed = parseListingParams(sp)
+
+  const result = await fetchCategoryListing(slug, {
+    locale,
+    page: parsed.page,
+    perPage: PER_PAGE,
+    sort: parsed.sort,
+    timeRange: parsed.timeRange,
+  })
   if (!result) return {}
+
+  const baseTitle = result.category.seoTitle ?? result.category.name
+  const title = parsed.page > 1 ? `${baseTitle} — Page ${parsed.page}` : baseTitle
+  const description = result.category.seoDesc ?? result.category.description ?? undefined
+
+  // Canonical points at the unfiltered, page-1 URL of this category.
+  const canonical = `/${locale}/category/${slug}`
+
+  // SEO policy:
+  //   - Page 1, default sort, all-time   → indexable + canonical
+  //   - Page N (default sort/time)        → indexable + prev/next link tags
+  //   - Any non-default sort/time         → noindex,follow (avoid duplicate-content surfaces)
+  const isFilteredView = parsed.sort !== 'latest' || parsed.timeRange !== 'all'
+  const robots: Metadata['robots'] = isFilteredView
+    ? { index: false, follow: true }
+    : { index: true, follow: true }
+
+  // Build prev/next link tags for paginated default-view pages.
+  const otherLinks: Array<{ rel: string; url: string }> = []
+  if (!isFilteredView) {
+    if (parsed.page > 1) {
+      const prev = parsed.page - 1
+      otherLinks.push({
+        rel: 'prev',
+        url: prev === 1 ? canonical : `${canonical}?page=${prev}`,
+      })
+    }
+    if (parsed.page < result.pageCount) {
+      otherLinks.push({ rel: 'next', url: `${canonical}?page=${parsed.page + 1}` })
+    }
+  }
+
   return {
-    title: result.category.seoTitle ?? result.category.name,
-    description: result.category.seoDesc ?? result.category.description,
+    title,
+    description,
+    alternates: {
+      canonical,
+      // Surface prev/next as alternates — Next renders them as <link> tags.
+      ...(otherLinks.length > 0 && {
+        types: Object.fromEntries(otherLinks.map((l) => [l.rel, l.url])),
+      }),
+    },
+    robots,
+    other: otherLinks.reduce<Record<string, string>>((acc, l) => {
+      acc[`link:${l.rel}`] = l.url
+      return acc
+    }, {}),
   }
 }
 
-export default async function CategoryPage({ params }: Props) {
+export default async function CategoryPage({ params, searchParams }: Props) {
   const { locale, slug } = await params
-  const result = await fetchArticlesByCategory(locale, slug)
+  const sp = await searchParams
+  const parsed = parseListingParams(sp)
+
+  const result = await fetchCategoryListing(slug, {
+    locale,
+    page: parsed.page,
+    perPage: PER_PAGE,
+    sort: parsed.sort,
+    timeRange: parsed.timeRange,
+  })
   if (!result) notFound()
+
+  // Out-of-range page → 404 (don't show a phantom empty page that could be indexed).
+  if (parsed.page > result.pageCount && result.total > 0) notFound()
+
+  const basePath = `/${locale}/category/${slug}`
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-12">
@@ -37,11 +107,18 @@ export default async function CategoryPage({ params }: Props) {
         )}
       </header>
 
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-        {result.posts.map((p) => (
-          <ArticleCard key={p.id} locale={locale} article={p} />
-        ))}
-      </div>
+      <ArticleListing
+        locale={locale}
+        basePath={basePath}
+        articles={result.rows}
+        page={result.page}
+        perPage={result.perPage}
+        pageCount={result.pageCount}
+        total={result.total}
+        sort={parsed.sort}
+        timeRange={parsed.timeRange}
+        searchParams={flattenSearchParams(sp)}
+      />
     </main>
   )
 }
