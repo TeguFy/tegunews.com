@@ -67,7 +67,7 @@ export interface GenerateResult {
 
 /** Loose Ai binding — Cloudflare's types lag the real surface. */
 interface AiBinding {
-  run(model: string, input: { messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>; max_tokens?: number; temperature?: number }): Promise<{ response?: string }>
+  run(model: string, input: { messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>; max_tokens?: number; temperature?: number; stream?: boolean }): Promise<{ response?: string } | ReadableStream>
 }
 
 export async function generateConversation(
@@ -323,9 +323,17 @@ async function runOne(
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
 ): Promise<string | null> {
   try {
-    const res = await ai.run(model, { messages, max_tokens: 400, temperature: 0.85 })
-    if (!res?.response) return null
-    return extractCommentText(res.response)
+    const res = await ai.run(model, { messages, max_tokens: 400, temperature: 0.85, stream: false })
+    if (!res || res instanceof ReadableStream) return null
+    const raw = (res as any).response
+    // Workers AI auto-parses JSON responses: `response` may be the parsed
+    // object `{ comment: "..." }` rather than a raw string. Handle both.
+    if (raw && typeof raw === 'object' && typeof raw.comment === 'string') {
+      return raw.comment.trim() || null
+    }
+    const text = typeof raw === 'string' ? raw : null
+    if (!text) return null
+    return extractCommentText(text)
   } catch (err) {
     // Network blip or model overload — caller logs to skipped[] and moves on.
     console.warn(JSON.stringify({ event: 'ai.run_failed', error: String(err) }))

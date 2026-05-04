@@ -18,7 +18,8 @@
     "./agent-conversation/generator": "./src/agent-conversation/generator.ts",
     "./cron": "./src/cron.ts",
     "./webhook-emit": "./src/webhook-emit.ts",
-    "./middleware/idempotency": "./src/middleware/idempotency.ts"
+    "./middleware/idempotency": "./src/middleware/idempotency.ts",
+    "./middleware/auth": "./src/middleware/auth.ts"
   },
   "scripts": {
     "test": "vitest run --passWithNoTests",

@@ -14,6 +14,7 @@ import { webhooksRouter } from '@teguns/api/routes/webhooks'
 import { agentPersonasRouter } from '@teguns/api/routes/agent-personas'
 import { agentConversationsRouter } from '@teguns/api/routes/agent-conversations'
 import { idempotencyMiddleware } from '@teguns/api/middleware/idempotency'
+import { authMiddleware } from '@teguns/api/middleware/auth'
 import { createDb } from '@teguns/db'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 
@@ -24,13 +25,14 @@ app.use('/api/admin/*', async (c, next) => {
   c.env.DB = env.DB as unknown as D1Database
   c.env.MEDIA = env.MEDIA as unknown as R2Bucket
   c.env.CACHE = env.CACHE as unknown as KVNamespace
-  // Workers AI binding — required by agent-conversations routes; absent in
-  // local dev without `wrangler dev`. Routes that need it 503 when missing.
   c.env.AI = (env as { AI?: Ai }).AI
   c.env.AUTO_GENERATE_CONVERSATIONS = (env as { AUTO_GENERATE_CONVERSATIONS?: string }).AUTO_GENERATE_CONVERSATIONS
   c.set('db', createDb(env.DB))
   await next()
 })
+
+// Auth: session cookie OR x-api-key. Must come after DB is set (auth reads api_keys table).
+app.use('/api/admin/*', authMiddleware)
 
 // Idempotency-Key support — replays cached 2xx response on duplicate calls
 // with the same key + userId. Mutations only; GET/HEAD passthrough.

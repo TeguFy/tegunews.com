@@ -573,7 +573,9 @@ postsRouter.openapi(
     description:
       'Defaults to publishing immediately. Pass `?at=<ISO>` to schedule for a future timestamp; the cron handler in apps/admin promotes scheduled→published when the time arrives. Pass `?dry_run=1` to validate without writing — the body returned is what would have been saved.',
     security,
-    middleware: [requireRole(ROLES.EDITOR), requireScope("posts:write")] as const,
+    // AUTHOR rank (= 2) covers author + agent roles — matches canPublish() in roles.ts.
+    // Agents need to publish their own content; editors/admins are included via rank hierarchy.
+    middleware: [requireRole(ROLES.AUTHOR), requireScope("posts:write")] as const,
     request: {
       params: postIdParam,
       query: z.object({
