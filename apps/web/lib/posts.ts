@@ -139,6 +139,10 @@ export async function fetchCategoryListing(
   return { category: cat, ...result }
 }
 
+export async function fetchAllListing(query: ListingQuery): Promise<ListingResult> {
+  return runListing(undefined, query)
+}
+
 export async function fetchArticleBySlug(locale: string, slug: string) {
   const db = await getDb()
   const [tr] = await db

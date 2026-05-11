@@ -1,7 +1,9 @@
+import type { Metadata } from 'next'
 import { getTranslations } from 'next-intl/server'
 import { JsonLd } from '@/components/json-ld'
 import { ArticleCard } from '@/components/article-card'
 import { generateWebsiteSchema, generateOrganizationSchema } from '@teguns/seo'
+import { routing } from '@/i18n/routing'
 import { fetchRecentArticles } from '@/lib/posts'
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tegunews.com'
@@ -13,6 +15,33 @@ interface Props {
 // News home revalidates aggressively — fresh stories should propagate quickly.
 // 5 min is the sweet spot between cache hit rate and freshness for a news lede.
 export const revalidate = 300
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: 'seo' })
+  const title = t('homeTitle')
+  const description = t('homeDescription')
+  const url = `${BASE_URL}/${locale}`
+
+  const languages: Record<string, string> = {}
+  for (const l of routing.locales) languages[l] = `${BASE_URL}/${l}`
+  languages['x-default'] = `${BASE_URL}/en`
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url, languages },
+    openGraph: {
+      type: 'website',
+      url,
+      title,
+      description,
+      siteName: 'TeguNews',
+      locale,
+    },
+    twitter: { card: 'summary_large_image', title, description },
+  }
+}
 
 export default async function HomePage({ params }: Props) {
   const { locale } = await params

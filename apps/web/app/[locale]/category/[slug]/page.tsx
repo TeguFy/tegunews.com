@@ -1,9 +1,12 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { generateBreadcrumbSchema } from '@teguns/seo'
+import { JsonLd } from '@/components/json-ld'
 import { fetchCategoryListing } from '@/lib/posts'
 import { ArticleListing } from '@/components/listing/article-listing'
 import { parseListingParams, flattenSearchParams } from '@/components/listing/params'
 
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://tegunews.com'
 const PER_PAGE = 12
 
 interface Props {
@@ -92,9 +95,38 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   if (parsed.page > result.pageCount && result.total > 0) notFound()
 
   const basePath = `/${locale}/category/${slug}`
+  const url = `${BASE_URL}${basePath}`
+
+  const breadcrumb = generateBreadcrumbSchema([
+    { name: 'Home', url: `${BASE_URL}/${locale}` },
+    { name: 'News', url: `${BASE_URL}/${locale}/news` },
+    { name: result.category.name, url },
+  ])
+
+  const collectionPage = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    '@id': `${url}#collection`,
+    url,
+    name: result.category.name,
+    description: result.category.description ?? undefined,
+    inLanguage: locale,
+    isPartOf: { '@type': 'WebSite', '@id': `${BASE_URL}/#website` },
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: result.total,
+      itemListElement: result.rows.slice(0, 12).map((p, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: `${BASE_URL}/${locale}/news/${p.slug}`,
+        name: p.title,
+      })),
+    },
+  }
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-12">
+      <JsonLd data={[breadcrumb, collectionPage]} />
       <header className="mb-10 border-b border-border pb-8">
         <p className="kicker text-primary">Category</p>
         <h1 className="mt-2 font-serif text-4xl font-extrabold tracking-tight md:text-5xl">

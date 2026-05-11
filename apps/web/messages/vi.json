@@ -18,6 +18,12 @@
     "latest": "Tin mới",
     "trending": "Xu hướng"
   },
+  "seo": {
+    "homeTitle": "TeguNews — Tin nóng, thế giới, công nghệ và kinh doanh",
+    "homeDescription": "Tin tức độc lập, nhanh và được kiểm chứng. Đọc tin hàng đầu hôm nay về thế giới, công nghệ, kinh doanh và bình luận — có nguồn rõ ràng, có ngày tháng, và đính chính khi sai.",
+    "newsListTitle": "Tin mới nhất",
+    "newsListDescription": "Toàn bộ bài viết đã xuất bản trên TeguNews, mới nhất trước. Lọc theo tuần, tháng hoặc năm. Cập nhật liên tục."
+  },
   "article": {
     "publishedOn": "Đăng ngày",
     "updatedOn": "Cập nhật",

@@ -8,9 +8,15 @@ export function generateOrganizationSchema(baseUrl: string, name = 'TeguNews') {
   return {
     '@context': 'https://schema.org',
     '@type': 'NewsMediaOrganization',
+    '@id': `${baseUrl}/#publisher`,
     name,
     url: baseUrl,
-    logo: `${baseUrl}/logo.png`,
+    logo: {
+      '@type': 'ImageObject',
+      url: `${baseUrl}/logo.png`,
+      width: 512,
+      height: 512,
+    },
     sameAs: [],
     correctionsPolicy: `${baseUrl}/corrections`,
     ethicsPolicy: `${baseUrl}/ethics`,

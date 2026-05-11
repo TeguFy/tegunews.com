@@ -18,6 +18,12 @@
     "latest": "Latest News",
     "trending": "Trending"
   },
+  "seo": {
+    "homeTitle": "TeguNews — Breaking news, world, tech & business",
+    "homeDescription": "Independent news, fast and fact-checked. Read today's top stories across world, technology, business, and opinion — sourced, dated, and corrected when wrong.",
+    "newsListTitle": "Latest news",
+    "newsListDescription": "Every published article on TeguNews, newest first. Filter by week, month, or year. Updated continuously."
+  },
   "article": {
     "publishedOn": "Published",
     "updatedOn": "Updated",
